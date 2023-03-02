@@ -1,4 +1,4 @@
-use crate::{app_state::AppState, response::Response, utils::get_content_length};
+use crate::{app_state::AppState, response::Response, utils::read_stream_request};
 
 use self::{delete::handle_delete, get::handle_get, post::handle_post, put::handle_put};
 
@@ -8,34 +8,38 @@ mod post;
 mod put;
 
 pub use put::PutMessage;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub async fn handle_request(stream: &mut TcpStream, state: &mut AppState) {
-    let mut buf = [0; 1024];
-    let n = match stream.read(&mut buf).await {
-        Ok(v) => v,
-        Err(_) => {
+    let (request, content_length) = match read_stream_request(stream).await {
+        Ok(req) => req,
+        Err(e) => {
+            eprintln!("Failed to read from stream: {}", e);
             let response = Response::new()
                 .status_line("HTTP/1.1 500 INTERNAL SERVER ERROR")
                 .to_string();
-            if let Err(e) = stream.write(response.as_bytes()).await {
+            if let Err(e) = stream.write_all(response.as_bytes()).await {
                 eprintln!("Failed to send response: {}", e);
             }
             return;
         }
     };
-    let request = String::from_utf8_lossy(&buf[..n]).to_string();
-    let response = match_request(&request, state).await;
+    let response = match_request(request, content_length, state).await;
 
-    if let Err(e) = stream.write(response.as_bytes()).await {
+    if let Err(e) = stream.write_all(response.as_bytes()).await {
         eprintln!("Failed to send response: {}", e);
+    }
+
+    if let Err(e) = stream.flush().await {
+        eprintln!("Failed to flush stream: {}", e);
     }
 }
 
-async fn match_request(request: &str, state: &mut AppState) -> String {
+async fn match_request(
+    request: String,
+    content_length: Option<usize>,
+    state: &mut AppState,
+) -> String {
     let mut lines = request.lines();
     let first_line = lines.next().unwrap_or("");
     let method = first_line.split_whitespace().next().unwrap_or("");
@@ -44,7 +48,7 @@ async fn match_request(request: &str, state: &mut AppState) -> String {
     match method {
         "GET" => handle_get(state).await,
         "POST" => {
-            let content_length = match get_content_length(&mut lines) {
+            let content_length = match content_length {
                 Some(len) => len,
                 None => {
                     return Response::new()
@@ -56,7 +60,7 @@ async fn match_request(request: &str, state: &mut AppState) -> String {
             handle_post(body, state).await
         }
         "PUT" => {
-            let content_length = match get_content_length(&mut lines) {
+            let content_length = match content_length {
                 Some(len) => len,
                 None => {
                     return Response::new()
