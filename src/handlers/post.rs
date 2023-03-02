@@ -33,7 +33,12 @@ pub async fn handle_post(body: &str, state: &mut AppState) -> String {
     };
 
     if imageUpdate {
-        state.image_store.save(&base64Image, &uuid);
+        if state.image_store.save(&base64Image, &uuid).is_err() {
+            return response
+                .status_line("HTTP/1.1 500 Internal Server Error")
+                .body("Failed to save image.")
+                .to_string();
+        }
     }
 
     let result = sqlx::query!(
