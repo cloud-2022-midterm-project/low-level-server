@@ -15,11 +15,11 @@ struct CompleteMessage<'a> {
     message: &'a str,
     likes: i32,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    base64Image: Maybe<&'a str>,
+    base64Image: Maybe<String>,
 }
 
 impl<'a> CompleteMessage<'a> {
-    pub fn new(message: &'a Message, image: Option<&'a str>) -> Self {
+    pub fn new(message: &'a Message, image: Option<String>) -> Self {
         CompleteMessage {
             uuid: &message.uuid,
             author: &message.author,
@@ -43,11 +43,11 @@ struct CompletePutUpdate<'a> {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     likes: &'a Maybe<i32>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    base64Image: Maybe<&'a str>,
+    base64Image: Maybe<String>,
 }
 
 impl<'a> CompletePutUpdate<'a> {
-    fn new(update: &'a PutUpdate, image: Option<&'a str>) -> Self {
+    fn new(update: &'a PutUpdate, image: Option<String>) -> Self {
         CompletePutUpdate {
             uuid: &update.uuid,
             author: &update.fields.author,
@@ -61,12 +61,10 @@ impl<'a> CompletePutUpdate<'a> {
     }
 }
 
-/// ## TODO
-/// Should we improve the cached response construction logic?
 pub(crate) async fn handle_get(state: &mut AppState) -> String {
     let response = Response::new().append_header("Content-Type: application/json");
 
-    // If there are mutation updates, return them
+    // if there are cached mutation updates, return them
     let AppState {
         updates_post,
         updates_put,
@@ -74,38 +72,30 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         ..
     } = state;
     if updates_post.len() > 0 || updates_put.len() > 0 || !updates_delete.is_empty() {
-        // constructing posts for response
-        let updates_post_vec = updates_post.values().collect::<Vec<_>>();
-        let images_post = state.image_store.get_many(
-            &updates_post_vec
-                .iter()
-                .map(|m| match m.has_image {
-                    true => Some(m.uuid.as_ref()),
-                    false => None,
+        // constructing posts
+        let posts = updates_post
+            .values()
+            .map(|m| {
+                CompleteMessage::new(m, {
+                    match m.has_image {
+                        true => state.image_store.get(m.uuid.as_ref()),
+                        false => None,
+                    }
                 })
-                .collect::<Vec<_>>(),
-        );
-        let posts = updates_post_vec
-            .iter()
-            .zip(images_post.iter())
-            .map(|(m, image)| CompleteMessage::new(m, image.as_deref()))
+            })
             .collect::<Vec<_>>();
 
-        // constructing puts for response
-        let updates_put_vec = updates_put.values().collect::<Vec<_>>();
-        let images_put = state.image_store.get_many(
-            &updates_put_vec
-                .iter()
-                .map(|update| match update.fields.imageUpdate {
-                    Maybe::Value(true) => Some(update.uuid.as_ref()),
-                    _ => None,
+        // constructing puts
+        let puts = updates_put
+            .values()
+            .map(|update| {
+                CompletePutUpdate::new(update, {
+                    match update.fields.imageUpdate {
+                        Maybe::Value(true) => state.image_store.get(update.uuid.as_ref()),
+                        _ => None,
+                    }
                 })
-                .collect::<Vec<_>>(),
-        );
-        let puts = updates_put_vec
-            .iter()
-            .zip(images_put.iter())
-            .map(|(update, image)| CompletePutUpdate::new(update, image.as_deref()))
+            })
             .collect::<Vec<_>>();
 
         let body = json!({
@@ -146,22 +136,18 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         }
     };
 
-    let images = state.image_store.get_many(
-        &messages
-            .iter()
-            .map(|m| match m.has_image {
-                true => Some(m.uuid.as_ref()),
-                false => None,
-            })
-            .collect::<Vec<_>>(),
-    );
-    let complete_messages: Vec<CompleteMessage> = messages
+    let messages: Vec<CompleteMessage> = messages
         .iter()
-        .zip(images.iter())
-        .map(|(m, image)| CompleteMessage {
-            base64Image: match image {
-                Some(image) => Maybe::Value(image),
-                None => Maybe::Absent,
+        .map(|m| CompleteMessage {
+            base64Image: match m.has_image {
+                true => {
+                    let image = state.image_store.get(m.uuid.as_ref());
+                    match image {
+                        Some(image) => Maybe::Value(image),
+                        None => Maybe::Absent,
+                    }
+                }
+                false => Maybe::Absent,
             },
             author: &m.author,
             likes: m.likes,
@@ -170,7 +156,7 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         })
         .collect();
 
-    let res_body = json!(complete_messages).to_string();
+    let res_body = json!(messages).to_string();
 
     response
         .append_header(&format!("Content-Length: {}", res_body.len()))
