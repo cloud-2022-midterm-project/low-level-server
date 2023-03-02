@@ -111,7 +111,7 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         let body = json!({
             "posts": posts,
             "puts": puts,
-            "deletes": *updates_delete,
+            "deletes": updates_delete,
         })
         .to_string();
 
@@ -129,9 +129,9 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
     let messages = match sqlx::query_as!(
         Message,
         "
-            SELECT *
-            FROM messages
-            "
+        SELECT *
+        FROM messages
+        "
     )
     .fetch_all(state.pool.as_ref())
     .await
