@@ -80,7 +80,7 @@ async fn main() {
     };
 
     // spawn the tcp listener thread
-    let handle = tokio::spawn(listener_task);
+    let tcp_listener_thread = tokio::spawn(listener_task);
 
     // leaving main thread to handle shutdown signal
 
@@ -119,5 +119,7 @@ async fn main() {
         .expect("Failed to send shutdown signal");
 
     // wait for the tcp listener to finish
-    handle.await.expect("Failed to join server task");
+    tcp_listener_thread
+        .await
+        .expect("Failed to join server task");
 }
