@@ -2,7 +2,10 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::{
-    app_state::AppState, app_state::PutUpdate, maybe::Maybe, models::Message, response::Response,
+    app_state::{AppState, PutUpdate},
+    maybe::Maybe,
+    models::Message,
+    response::Response,
 };
 
 #[derive(Serialize)]

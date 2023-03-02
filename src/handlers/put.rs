@@ -1,4 +1,8 @@
-use crate::{app_state::AppState, app_state::PutUpdate, maybe::Maybe, response::Response};
+use crate::{
+    app_state::{AppState, PutUpdate},
+    maybe::Maybe,
+    response::Response,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -62,7 +66,12 @@ pub async fn handle_put(uuid: &str, body: &str, state: &mut AppState) -> String 
         index += 1;
         if let Maybe::Value(image) = &payload.base64Image {
             // update image
-            state.image_store.save(image, uuid);
+            if state.image_store.save(image, uuid).is_err() {
+                return response
+                    .status_line("HTTP/1.1 500 Internal Server Error")
+                    .body("Failed to save image.")
+                    .to_string();
+            }
             params.push(BindValue::HasImage(true));
         } else {
             // remove image

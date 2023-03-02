@@ -1,3 +1,5 @@
+use std::io;
+
 pub struct ImageStore {
     pub(crate) base_path: String,
 }
@@ -7,8 +9,8 @@ impl ImageStore {
         Self { base_path }
     }
 
-    pub fn save(&self, image: &str, user_id: &str) {
-        std::fs::write(self.file_path(user_id), image).expect("Failed to save image");
+    pub fn save(&self, image: &str, user_id: &str) -> io::Result<()> {
+        std::fs::write(self.file_path(user_id), image)
     }
 
     pub fn remove(&self, user_id: &str) -> std::io::Result<()> {
