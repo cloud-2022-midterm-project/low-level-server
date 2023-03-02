@@ -42,7 +42,7 @@ async fn main() {
 
         let listener = TcpListener::bind(addr)
             .await
-            .expect(format!("Failed to bind to {}", addr).as_str());
+            .unwrap_or_else(|_| panic!("Failed to bind to {}", addr));
 
         let mut state = AppState {
             pool: Arc::clone(&db_pool),
