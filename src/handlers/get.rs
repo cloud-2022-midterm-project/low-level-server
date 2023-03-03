@@ -138,21 +138,14 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
 
     let messages: Vec<CompleteMessage> = messages
         .into_iter()
-        .map(|m| CompleteMessage {
-            base64Image: match m.has_image {
-                true => {
-                    let image = state.image_store.get(m.uuid.as_ref());
-                    match image {
-                        Some(image) => Maybe::Value(image),
-                        None => Maybe::Absent,
-                    }
+        .map(|m| {
+            let image = {
+                match m.has_image {
+                    true => state.image_store.get(&m.uuid),
+                    false => None,
                 }
-                false => Maybe::Absent,
-            },
-            author: m.author,
-            likes: m.likes,
-            message: m.message,
-            uuid: m.uuid,
+            };
+            CompleteMessage::new(m, image)
         })
         .collect();
 
