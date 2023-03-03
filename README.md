@@ -1,10 +1,10 @@
-# Low-level Overengineered Server
+# Low-level Server
 
-This is a low-level, destined to fail, overengineered,  server for cloud computing midterm.
+This is a low-level, destined to fail, overengineered server for cloud computing midterm.
 
 ## How to run
 
-### INSTALL RUST
+### INSTALL RUST and cargo
 
 ```bash
 https://www.rust-lang.org/tools/install
@@ -14,7 +14,24 @@ https://www.rust-lang.org/tools/install
 
 Create a `.env` file and fill it (see .env.example).
 
-### Run
+### Create local database
+
+With `DATABASE_URL=postgres://postgres:mysecretpassword@localhost:5432/postgres` in `.env`
+
+```bash
+docker run --name postgres -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d postgres
+```
+
+### Migration
+
+Do this after the database is created to create tables.
+
+```bash
+cargo install sqlx-cli
+sqlx migrate run
+```
+
+### Start the server
 
 Debug mode:
 
