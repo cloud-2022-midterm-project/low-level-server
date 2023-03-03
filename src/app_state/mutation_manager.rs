@@ -15,9 +15,9 @@ pub struct MutationManager {
 impl MutationManager {
     pub fn new() -> Self {
         Self {
-            updates_post: AHashMap::with_capacity(1000),
-            updates_put: AHashMap::with_capacity(1000),
-            updates_delete: Vec::with_capacity(1000),
+            updates_post: AHashMap::with_capacity(512),
+            updates_put: AHashMap::with_capacity(512),
+            updates_delete: Vec::with_capacity(512),
         }
     }
 
