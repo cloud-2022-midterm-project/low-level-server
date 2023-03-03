@@ -10,7 +10,7 @@ mod put;
 pub use put::PutMessage;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub async fn handle_request(stream: &mut TcpStream, state: &mut AppState) {
+pub async fn handle_connection(stream: &mut TcpStream, state: &mut AppState) {
     let (request, content_length) = match read_stream_request(stream).await {
         Ok(req) => req,
         Err(e) => {

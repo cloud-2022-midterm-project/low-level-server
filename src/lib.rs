@@ -8,4 +8,4 @@ mod models;
 mod response;
 mod utils;
 
-pub use handlers::handle_request;
+pub use handlers::handle_connection;

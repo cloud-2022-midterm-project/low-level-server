@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use dotenv::dotenv;
-use server_low_level::{app_state::AppState, handle_request, image_store::ImageStore};
+use server_low_level::{app_state::AppState, handle_connection, image_store::ImageStore};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, signal, sync::mpsc};
@@ -65,7 +65,7 @@ async fn main() {
                 result = listener.accept() => {
                     match result {
                         Ok((mut stream, _)) => {
-                            handle_request(&mut stream, &mut state).await;
+                            handle_connection(&mut stream, &mut state).await;
                         }
                         Err(e) => {
                             eprintln!("Failed to accept connection: {}", e);
