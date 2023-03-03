@@ -1,4 +1,8 @@
-use crate::{app_state::AppState, response::Response, utils::read_stream_request};
+use crate::{
+    app_state::AppState,
+    request::{method::Method, Request},
+    response::Response,
+};
 
 use self::{delete::handle_delete, get::handle_get, post::handle_post, put::handle_put};
 
@@ -11,7 +15,7 @@ pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
-    let (request, content_length) = match read_stream_request(&mut stream).await {
+    let request = match Request::from_stream(&mut stream).await {
         Ok(req) => req,
         Err(e) => {
             eprintln!("Failed to read from stream: {}", e);
@@ -24,58 +28,38 @@ pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
             return;
         }
     };
-    let response = match_request(request, content_length, state).await;
+
+    let response = process_request(request, state).await;
 
     if let Err(e) = stream.write_all(response.as_bytes()).await {
         eprintln!("Failed to send response: {}", e);
     }
-
-    // if let Err(e) = stream.flush().await {
-    //     eprintln!("Failed to flush stream: {}", e);
-    // }
 }
 
-async fn match_request(
-    request: String,
-    content_length: Option<usize>,
-    state: &mut AppState,
-) -> String {
-    let mut lines = request.lines();
-    let first_line = lines.next().unwrap_or("");
-    let method = first_line.split_whitespace().next().unwrap_or("");
-    let path = first_line.split_whitespace().nth(1).unwrap_or("");
-
-    match method {
-        "GET" => handle_get(state).await,
-        "POST" => {
-            let content_length = match content_length {
-                Some(len) => len,
+async fn process_request(request: Request, state: &mut AppState) -> String {
+    match request.method() {
+        Method::Get => handle_get(state).await,
+        Method::Post => match request.body() {
+            Some(body) => handle_post(body, state).await,
+            None => Response::new()
+                .status_line("HTTP/1.1 411 LENGTH REQUIRED")
+                .to_string(),
+        },
+        Method::Put => {
+            let body = match request.body() {
+                Some(body) => body,
                 None => {
                     return Response::new()
                         .status_line("HTTP/1.1 411 LENGTH REQUIRED")
                         .to_string();
                 }
             };
-            let body = &request[(request.len() - content_length)..];
-            handle_post(body, state).await
-        }
-        "PUT" => {
-            let content_length = match content_length {
-                Some(len) => len,
-                None => {
-                    return Response::new()
-                        .status_line("HTTP/1.1 411 LENGTH REQUIRED")
-                        .to_string();
-                }
-            };
-            let body = &request[(request.len() - content_length)..];
-            let uuid = path.trim_start_matches("/api/messages/");
+            let uuid = request.uri().trim_start_matches("/api/messages/");
             handle_put(uuid, body, state).await
         }
-        "DELETE" => {
-            let uuid = path.trim_start_matches("/api/messages/");
+        Method::Delete => {
+            let uuid = request.uri().trim_start_matches("/api/messages/");
             handle_delete(uuid, state).await
         }
-        _ => "HTTP/1.1 404 NOT FOUND\r\n\r".to_string(),
     }
 }

@@ -5,7 +5,7 @@ mod handlers;
 pub mod image_store;
 mod maybe;
 mod models;
+mod request;
 mod response;
-mod utils;
 
 pub use handlers::handle_connection;
