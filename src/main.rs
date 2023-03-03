@@ -43,10 +43,6 @@ async fn main() {
                 .expect("PORT must be a number"),
         ));
 
-        let listener = TcpListener::bind(addr)
-            .await
-            .unwrap_or_else(|_| panic!("Failed to bind to {}", addr));
-
         let mut state = AppState {
             pool: db_pool,
             image_store: ImageStore::new({
@@ -60,7 +56,17 @@ async fn main() {
             mutations: MutationManager::new(),
         };
 
-        println!("Listening on {}", addr);
+        let listener = match TcpListener::bind(addr).await {
+            Ok(listener) => {
+                println!("Listening on {}", addr);
+                listener
+            }
+            Err(e) => {
+                eprintln!("Failed to bind to {}: {}", addr, e);
+                std::process::exit(1);
+            }
+        };
+
         loop {
             tokio::select! {
                 result = listener.accept() => {
