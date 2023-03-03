@@ -6,6 +6,8 @@ use std::sync::Arc;
 
 use crate::{handlers::PutMessage, image_store::ImageStore};
 
+use self::mutation_manager::MutationManager;
+
 #[derive(Serialize)]
 pub struct PutUpdate {
     pub(crate) fields: PutMessage,
@@ -15,5 +17,5 @@ pub struct PutUpdate {
 pub struct AppState {
     pub pool: Arc<PgPool>,
     pub image_store: ImageStore,
-    pub mutations: mutation_manager::MutationManager,
+    pub mutations: MutationManager,
 }
