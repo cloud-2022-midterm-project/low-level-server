@@ -9,50 +9,50 @@ use crate::{
 };
 
 #[derive(Serialize)]
-struct CompleteMessage<'a> {
-    uuid: &'a str,
-    author: &'a str,
-    message: &'a str,
+struct CompleteMessage {
+    uuid: String,
+    author: String,
+    message: String,
     likes: i32,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     base64Image: Maybe<String>,
 }
 
-impl<'a> CompleteMessage<'a> {
-    pub fn new(message: &'a Message, image: Option<String>) -> Self {
+impl CompleteMessage {
+    pub fn new(message: Message, image: Option<String>) -> Self {
         CompleteMessage {
-            uuid: &message.uuid,
-            author: &message.author,
+            uuid: message.uuid,
+            author: message.author,
             base64Image: match image {
                 Some(image) => Maybe::Value(image),
                 None => Maybe::Absent,
             },
             likes: message.likes,
-            message: &message.message,
+            message: message.message,
         }
     }
 }
 
 #[derive(Serialize)]
-struct CompletePutUpdate<'a> {
-    uuid: &'a str,
+struct CompletePutUpdate {
+    uuid: String,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    author: &'a Maybe<String>,
+    author: Maybe<String>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    message: &'a Maybe<String>,
+    message: Maybe<String>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    likes: &'a Maybe<i32>,
+    likes: Maybe<i32>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     base64Image: Maybe<String>,
 }
 
-impl<'a> CompletePutUpdate<'a> {
-    fn new(update: &'a PutUpdate, image: Option<String>) -> Self {
+impl CompletePutUpdate {
+    fn new(update: PutUpdate, image: Option<String>) -> Self {
         CompletePutUpdate {
-            uuid: &update.uuid,
-            author: &update.fields.author,
-            message: &update.fields.message,
-            likes: &update.fields.likes,
+            uuid: update.uuid,
+            author: update.fields.author,
+            message: update.fields.message,
+            likes: update.fields.likes,
             base64Image: match image {
                 Some(image) => Maybe::Value(image),
                 None => Maybe::Absent,
@@ -72,29 +72,31 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         ..
     } = state;
     if updates_post.len() > 0 || updates_put.len() > 0 || !updates_delete.is_empty() {
-        // constructing posts
+        // constructing posts, while draining the updates_post map
         let posts = updates_post
-            .values()
-            .map(|m| {
-                CompleteMessage::new(m, {
+            .drain()
+            .map(|(_, m)| {
+                let image = {
                     match m.has_image {
-                        true => state.image_store.get(m.uuid.as_ref()),
+                        true => state.image_store.get(&m.uuid),
                         false => None,
                     }
-                })
+                };
+                CompleteMessage::new(m, image)
             })
             .collect::<Vec<_>>();
 
-        // constructing puts
+        // constructing puts, while draining the updates_put map
         let puts = updates_put
-            .values()
-            .map(|update| {
-                CompletePutUpdate::new(update, {
+            .drain()
+            .map(|(_, update)| {
+                let image = {
                     match update.fields.imageUpdate {
-                        Maybe::Value(true) => state.image_store.get(update.uuid.as_ref()),
+                        Maybe::Value(true) => state.image_store.get(&update.uuid),
                         _ => None,
                     }
-                })
+                };
+                CompletePutUpdate::new(update, image)
             })
             .collect::<Vec<_>>();
 
@@ -105,9 +107,7 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         })
         .to_string();
 
-        // clear updates
-        updates_post.clear();
-        updates_put.clear();
+        // clear the deletes
         updates_delete.clear();
 
         return response
@@ -137,7 +137,7 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
     };
 
     let messages: Vec<CompleteMessage> = messages
-        .iter()
+        .into_iter()
         .map(|m| CompleteMessage {
             base64Image: match m.has_image {
                 true => {
@@ -149,10 +149,10 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
                 }
                 false => Maybe::Absent,
             },
-            author: &m.author,
+            author: m.author,
             likes: m.likes,
-            message: &m.message,
-            uuid: &m.uuid,
+            message: m.message,
+            uuid: m.uuid,
         })
         .collect();
 
