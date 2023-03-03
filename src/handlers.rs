@@ -7,7 +7,7 @@ mod get;
 mod post;
 mod put;
 
-pub use put::PutMessage;
+pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub async fn handle_connection(stream: &mut TcpStream, state: &mut AppState) {

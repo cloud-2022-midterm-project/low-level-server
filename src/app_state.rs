@@ -1,9 +1,10 @@
-use ahash::AHashMap;
+pub mod mutation_manager;
+
 use serde::Serialize;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::{handlers::PutMessage, image_store::ImageStore, models::Message};
+use crate::{handlers::PutMessage, image_store::ImageStore};
 
 #[derive(Serialize)]
 pub struct PutUpdate {
@@ -14,7 +15,5 @@ pub struct PutUpdate {
 pub struct AppState {
     pub pool: Arc<PgPool>,
     pub image_store: ImageStore,
-    pub updates_post: AHashMap<String, Message>,
-    pub updates_put: AHashMap<String, PutUpdate>,
-    pub updates_delete: Vec<String>,
+    pub mutations: mutation_manager::MutationManager,
 }

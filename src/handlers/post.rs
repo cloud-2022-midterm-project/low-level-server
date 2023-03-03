@@ -55,16 +55,13 @@ pub async fn handle_post(body: &str, state: &mut AppState) -> String {
 
     match result {
         Ok(_) => {
-            state.updates_post.insert(
-                uuid.clone(),
-                Message {
-                    uuid,
-                    author,
-                    message,
-                    likes,
-                    has_image: imageUpdate,
-                },
-            );
+            state.mutations.add_post(Message {
+                uuid,
+                author,
+                message,
+                likes,
+                has_image: imageUpdate,
+            });
             response.set_status_line("HTTP/1.1 201 OK");
         }
         Err(_) => {

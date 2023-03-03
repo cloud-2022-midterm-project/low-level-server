@@ -1,6 +1,9 @@
-use ahash::AHashMap;
 use dotenv::dotenv;
-use server_low_level::{app_state::AppState, handle_connection, image_store::ImageStore};
+use server_low_level::{
+    app_state::{mutation_manager::MutationManager, AppState},
+    handle_connection,
+    image_store::ImageStore,
+};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, signal, sync::mpsc};
@@ -54,9 +57,7 @@ async fn main() {
                 }
                 path
             }),
-            updates_post: AHashMap::with_capacity(1000),
-            updates_put: AHashMap::with_capacity(1000),
-            updates_delete: Vec::with_capacity(1000),
+            mutations: MutationManager::new(),
         };
 
         println!("Listening on {}", addr);

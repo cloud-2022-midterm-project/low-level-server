@@ -1,12 +1,19 @@
 use crate::{
-    app_state::{AppState, PutUpdate},
+    app_state::{AppState},
     maybe::Maybe,
     response::Response,
 };
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+pub enum BindValue {
+    Author(String),
+    Message(String),
+    Likes(i32),
+    HasImage(bool),
+}
+
+#[derive(Deserialize, Serialize, Default)]
 pub struct PutMessage {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     pub author: Maybe<String>,
@@ -36,21 +43,14 @@ pub async fn handle_put(uuid: &str, body: &str, state: &mut AppState) -> String 
     let mut command = "UPDATE messages SET ".to_string();
     let mut index = 1;
 
-    enum BindValue<'a> {
-        Author(&'a str),
-        Message(&'a str),
-        Likes(i32),
-        HasImage(bool),
-    }
-
     let mut params = Vec::with_capacity(5);
 
-    if let Maybe::Value(author) = &payload.author {
+    if let Maybe::Value(author) = payload.author {
         command.push_str(&format!("author = ${index}, "));
         index += 1;
         params.push(BindValue::Author(author));
     }
-    if let Maybe::Value(message) = &payload.message {
+    if let Maybe::Value(message) = payload.message {
         command.push_str(&format!("message = ${index}, "));
         index += 1;
         params.push(BindValue::Message(message));
@@ -109,42 +109,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: &mut AppState) -> String 
             if result.rows_affected() == 0 {
                 response.set_status_line("HTTP/1.1 404 Not Found");
             } else {
-                // if there's a post update of this uuid, modify it rather than adding to updates_put
-                if let Some(m) = state.updates_post.get_mut(uuid) {
-                    for param in params {
-                        match param {
-                            BindValue::Author(v) => m.author = v.to_string(),
-                            BindValue::Message(v) => m.message = v.to_string(),
-                            BindValue::Likes(v) => m.likes = v,
-                            BindValue::HasImage(v) => m.has_image = v,
-                        }
-                    }
-                } else {
-                    // merge with existing update if it exists
-                    state
-                        .updates_put
-                        .entry(uuid.to_string())
-                        .and_modify(|m| {
-                            for param in params {
-                                match param {
-                                    BindValue::Author(v) => {
-                                        m.fields.author = Maybe::Value(v.to_string())
-                                    }
-                                    BindValue::Message(v) => {
-                                        m.fields.message = Maybe::Value(v.to_string())
-                                    }
-                                    BindValue::Likes(v) => m.fields.likes = Maybe::Value(v),
-                                    BindValue::HasImage(v) => {
-                                        m.fields.imageUpdate = Maybe::Value(v)
-                                    }
-                                }
-                            }
-                        })
-                        .or_insert_with(|| PutUpdate {
-                            fields: payload,
-                            uuid: uuid.to_string(),
-                        });
-                }
+                state.mutations.add_put(uuid, params);
                 response.set_status_line("HTTP/1.1 204 No Content");
             }
         }

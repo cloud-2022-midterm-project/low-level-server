@@ -65,15 +65,11 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
     let response = Response::new().append_header("Content-Type: application/json");
 
     // if there are cached mutation updates, return them
-    let AppState {
-        updates_post,
-        updates_put,
-        updates_delete,
-        ..
-    } = state;
-    if updates_post.len() > 0 || updates_put.len() > 0 || !updates_delete.is_empty() {
+    if !state.mutations.is_empty() {
         // constructing posts, while draining the updates_post map
-        let posts = updates_post
+        let posts = state
+            .mutations
+            .updates_post_mut()
             .drain()
             .map(|(_, m)| {
                 let image = {
@@ -87,7 +83,9 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
             .collect::<Vec<_>>();
 
         // constructing puts, while draining the updates_put map
-        let puts = updates_put
+        let puts = state
+            .mutations
+            .updates_put_mut()
             .drain()
             .map(|(_, update)| {
                 let image = {
@@ -103,12 +101,11 @@ pub(crate) async fn handle_get(state: &mut AppState) -> String {
         let body = json!({
             "posts": posts,
             "puts": puts,
-            "deletes": updates_delete,
+            "deletes": state.mutations.updates_delete(),
         })
         .to_string();
 
-        // clear the deletes
-        updates_delete.clear();
+        state.mutations.clear();
 
         return response
             .append_header(&format!("Content-Length: {}", body.len()))

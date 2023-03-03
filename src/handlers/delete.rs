@@ -20,15 +20,7 @@ pub(crate) async fn handle_delete(uuid: &str, state: &mut AppState) -> String {
             } else {
                 // remove from image store if it exists
                 state.image_store.remove(uuid).ok();
-
-                // remove from updates_put if it exists
-                state.updates_put.remove(uuid);
-
-                // remove from updates_post if it exists
-                if matches!(state.updates_post.remove(uuid), None) {
-                    state.updates_delete.push(uuid.to_string());
-                }
-
+                state.mutations.add_delete(uuid);
                 response.set_status_line("HTTP/1.1 204 NO CONTENT");
             }
         }
