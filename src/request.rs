@@ -66,8 +66,8 @@ impl Request {
                 _ => (),
             }
 
-            // stream's read_line() will append a newline to the end of the line
-            // we need an empty string to read the next line
+            // stream's read_line() will append read bytes to the string
+            // we need an empty string before reading the next line
             header_line.clear();
         }
 
