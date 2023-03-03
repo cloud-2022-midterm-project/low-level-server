@@ -22,7 +22,7 @@ pub struct Request {
 }
 
 impl Request {
-    /// Read data from the stream and create a new HTTP `Request`.
+    /// Reads data from a tcp stream and creates a new HTTP `Request`.
     ///
     /// # Errors
     ///
