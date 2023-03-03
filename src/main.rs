@@ -48,7 +48,7 @@ async fn main() {
             .unwrap_or_else(|_| panic!("Failed to bind to {}", addr));
 
         let mut state = AppState {
-            pool: Arc::clone(&db_pool),
+            pool: db_pool,
             image_store: ImageStore::new({
                 let path = std::env::var("IMAGES_BASE_PATH").expect("IMAGES_BASE_PATH must be set");
                 // check if this path directory exists
