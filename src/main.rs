@@ -65,8 +65,8 @@ async fn main() {
             tokio::select! {
                 result = listener.accept() => {
                     match result {
-                        Ok((mut stream, _)) => {
-                            handle_connection(&mut stream, &mut state).await;
+                        Ok((stream, _)) => {
+                            handle_connection(stream, &mut state).await;
                         }
                         Err(e) => {
                             eprintln!("Failed to accept connection: {}", e);

@@ -10,8 +10,8 @@ mod put;
 pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub async fn handle_connection(stream: &mut TcpStream, state: &mut AppState) {
-    let (request, content_length) = match read_stream_request(stream).await {
+pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
+    let (request, content_length) = match read_stream_request(&mut stream).await {
         Ok(req) => req,
         Err(e) => {
             eprintln!("Failed to read from stream: {}", e);
@@ -30,9 +30,9 @@ pub async fn handle_connection(stream: &mut TcpStream, state: &mut AppState) {
         eprintln!("Failed to send response: {}", e);
     }
 
-    if let Err(e) = stream.flush().await {
-        eprintln!("Failed to flush stream: {}", e);
-    }
+    // if let Err(e) = stream.flush().await {
+    //     eprintln!("Failed to flush stream: {}", e);
+    // }
 }
 
 async fn match_request(

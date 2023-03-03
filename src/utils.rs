@@ -18,7 +18,7 @@ pub(crate) fn get_content_length(lines: &mut std::str::Lines) -> Option<usize> {
 pub(crate) async fn read_stream_request(
     stream: &mut TcpStream,
 ) -> io::Result<(String, Option<usize>)> {
-    let mut request_buf: Vec<u8> = Vec::new();
+    let mut request_buf: Vec<u8> = Vec::with_capacity(512);
     let mut request_len = 0;
 
     let mut checked_content_length = false;
