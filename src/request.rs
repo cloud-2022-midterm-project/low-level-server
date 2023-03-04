@@ -8,12 +8,6 @@ use tokio::{
 
 use self::method::Method;
 
-impl Default for Method {
-    fn default() -> Self {
-        Self::Get
-    }
-}
-
 #[derive(Default, Debug)]
 pub struct Request {
     method: Method,

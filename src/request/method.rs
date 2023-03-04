@@ -8,6 +8,12 @@ pub enum Method {
     Delete,
 }
 
+impl Default for Method {
+    fn default() -> Self {
+        Self::Get
+    }
+}
+
 impl FromStr for Method {
     type Err = &'static str;
 
