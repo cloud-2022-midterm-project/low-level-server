@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{app_state::AppState, models::Message, response::Response};
@@ -12,7 +14,7 @@ pub struct PostMessage {
     base64Image: String,
 }
 
-pub async fn handle_post(body: &str, state: &mut AppState) -> String {
+pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
 
     let PostMessage {
@@ -55,7 +57,7 @@ pub async fn handle_post(body: &str, state: &mut AppState) -> String {
 
     match result {
         Ok(_) => {
-            state.mutations.add_post(Message {
+            state.mutations.lock().await.add_post(Message {
                 uuid,
                 author,
                 message,

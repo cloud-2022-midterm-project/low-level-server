@@ -6,7 +6,11 @@ use server_low_level::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::{net::TcpListener, signal, sync::mpsc};
+use tokio::{
+    net::TcpListener,
+    signal,
+    sync::{mpsc, Mutex},
+};
 
 #[tokio::main]
 async fn main() {
@@ -43,11 +47,11 @@ async fn main() {
                 .expect("PORT must be a number"),
         ));
 
-        let mut state = AppState {
+        let state = Arc::new(AppState {
             pool: db_pool,
             image_store: ImageStore::new(),
-            mutations: MutationManager::new(),
-        };
+            mutations: Mutex::new(MutationManager::new()),
+        });
 
         let listener = match TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -65,7 +69,7 @@ async fn main() {
                 result = listener.accept() => {
                     match result {
                         Ok((stream, _)) => {
-                            handle_connection(stream, &mut state).await;
+                            handle_connection(stream, Arc::clone(&state)).await;
                         }
                         Err(e) => {
                             eprintln!("Failed to accept connection: {}", e);

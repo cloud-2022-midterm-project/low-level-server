@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::{app_state::AppState, response::Response};
 
-pub(crate) async fn handle_delete(uuid: &str, state: &mut AppState) -> String {
+pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
 
     let result = sqlx::query!(
@@ -20,7 +22,7 @@ pub(crate) async fn handle_delete(uuid: &str, state: &mut AppState) -> String {
             } else {
                 // remove from image store if it exists
                 state.image_store.remove(uuid).ok();
-                state.mutations.add_delete(uuid);
+                state.mutations.lock().await.add_delete(uuid);
                 response.set_status_line("HTTP/1.1 204 NO CONTENT");
             }
         }

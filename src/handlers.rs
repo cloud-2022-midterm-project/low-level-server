@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     app_state::AppState,
     request::{method::Method, Request},
@@ -14,7 +16,7 @@ mod put;
 pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
+pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
     let request = match Request::from_stream(&mut stream).await {
         Ok(req) => req,
         Err(e) => {
@@ -29,6 +31,17 @@ pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
         }
     };
 
+    // if GET request, spawn a new task to handle it
+    if matches!(request.method(), Method::Get) {
+        tokio::spawn(async move {
+            let response = handle_get(request, state).await;
+            if let Err(e) = stream.write_all(response.as_bytes()).await {
+                eprintln!("Failed to send response: {}", e);
+            }
+        });
+        return;
+    }
+
     let response = process_request(request, state).await;
 
     if let Err(e) = stream.write_all(response.as_bytes()).await {
@@ -36,9 +49,9 @@ pub async fn handle_connection(mut stream: TcpStream, state: &mut AppState) {
     }
 }
 
-async fn process_request(request: Request, state: &mut AppState) -> String {
+async fn process_request(request: Request, state: Arc<AppState>) -> String {
     match request.method() {
-        Method::Get => handle_get(state).await,
+        // Method::Get => handle_get(state).await,
         Method::Post => match request.body() {
             Some(body) => handle_post(body, state).await,
             None => Response::new()
@@ -61,5 +74,6 @@ async fn process_request(request: Request, state: &mut AppState) -> String {
             let uuid = request.uri().trim_start_matches("/api/messages/");
             handle_delete(uuid, state).await
         }
+        Method::Get => unreachable!(),
     }
 }

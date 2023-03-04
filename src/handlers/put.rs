@@ -1,8 +1,6 @@
-use crate::{
-    app_state::{AppState},
-    maybe::Maybe,
-    response::Response,
-};
+use std::sync::Arc;
+
+use crate::{app_state::AppState, maybe::Maybe, response::Response};
 
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +25,7 @@ pub struct PutMessage {
     pub base64Image: Maybe<String>,
 }
 
-pub async fn handle_put(uuid: &str, body: &str, state: &mut AppState) -> String {
+pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
 
     let payload: PutMessage = match serde_json::from_str(body) {
@@ -109,7 +107,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: &mut AppState) -> String 
             if result.rows_affected() == 0 {
                 response.set_status_line("HTTP/1.1 404 Not Found");
             } else {
-                state.mutations.add_put(uuid, params);
+                state.mutations.lock().await.add_put(uuid, params);
                 response.set_status_line("HTTP/1.1 204 No Content");
             }
         }
