@@ -58,7 +58,7 @@ async fn main() {
 
         let listener = match TcpListener::bind(addr).await {
             Ok(listener) => {
-                println!("Listening on {}", addr);
+                println!("Listening on {}", listener.local_addr().unwrap());
                 listener
             }
             Err(e) => {
