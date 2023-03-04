@@ -5,8 +5,17 @@ pub struct ImageStore {
 }
 
 impl ImageStore {
-    pub fn new(base_path: String) -> Self {
-        Self { base_path }
+    pub fn new() -> Self {
+        Self {
+            base_path: {
+                let path = std::env::var("IMAGES_BASE_PATH").expect("IMAGES_BASE_PATH must be set");
+                // check if this path directory exists
+                if !std::path::Path::new(&path).exists() {
+                    panic!("IMAGES_BASE_PATH directory does not exist, the given path is {path}.");
+                }
+                path
+            },
+        }
     }
 
     pub fn save(&self, image: &str, user_id: &str) -> io::Result<()> {
@@ -39,5 +48,11 @@ impl ImageStore {
         std::fs::canonicalize(&self.base_path)
             .expect("Base path is not a valid path")
             .join(user_id)
+    }
+}
+
+impl Default for ImageStore {
+    fn default() -> Self {
+        Self::new()
     }
 }

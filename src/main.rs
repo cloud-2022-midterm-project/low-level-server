@@ -45,14 +45,7 @@ async fn main() {
 
         let mut state = AppState {
             pool: db_pool,
-            image_store: ImageStore::new({
-                let path = std::env::var("IMAGES_BASE_PATH").expect("IMAGES_BASE_PATH must be set");
-                // check if this path directory exists
-                if !std::path::Path::new(&path).exists() {
-                    panic!("IMAGES_BASE_PATH directory does not exist, the given path is {path}.");
-                }
-                path
-            }),
+            image_store: ImageStore::new(),
             mutations: MutationManager::new(),
         };
 
