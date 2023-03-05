@@ -36,12 +36,29 @@ pub struct Entry {
     uuid: String,
 }
 
-#[derive(Serialize, Default, Debug)]
+#[derive(Serialize, Debug)]
 pub struct MutationResults {
     pub posts: Vec<CompleteMessage>,
     pub puts: Vec<CompletePutUpdate>,
     pub deletes: Vec<String>,
     pub done: bool,
+}
+
+impl MutationResults {
+    pub fn new() -> Self {
+        Self {
+            deletes: Vec::with_capacity(16),
+            done: false,
+            posts: Vec::with_capacity(16),
+            puts: Vec::with_capacity(16),
+        }
+    }
+}
+
+impl Default for MutationResults {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct MutationManager {
@@ -114,9 +131,11 @@ impl MutationManager {
             // get a file handle to the post mutation file
             let path = self.get_mutation_file_path(id, Kind::Post);
             let file_content = std::fs::read_to_string(&path).unwrap();
+
             // read from the file into a message
             let mut message: Message =
                 serde_json::from_str(&file_content).expect("Failed to parse post mutation file");
+
             // update the message
             for param in params {
                 match param {
@@ -126,6 +145,7 @@ impl MutationManager {
                     BindValue::HasImage(v) => message.has_image = v,
                 }
             }
+
             // write back to the file
             std::fs::write(&path, serde_json::to_string(&message).unwrap()).unwrap();
         } else {
