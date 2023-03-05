@@ -48,7 +48,7 @@ async fn main() {
                 .expect("PORT must be a number"),
         ));
 
-        const PAGINATION_PAGE_SIZE: usize = 16;
+        const PAGINATION_PAGE_SIZE: usize = 64;
 
         let state = Arc::new(AppState {
             pool: db_pool,
