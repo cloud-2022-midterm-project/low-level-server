@@ -42,6 +42,7 @@ pub struct MutationResults {
     pub posts: Vec<CompleteMessage>,
     pub puts: Vec<CompletePutUpdate>,
     pub deletes: Vec<String>,
+    pub done: bool,
 }
 
 pub struct MutationManager {
@@ -216,7 +217,7 @@ impl MutationManager {
         PaginationMetadata::new(self.updates_all.len(), self.page_size)
     }
 
-    pub fn get(&mut self, mut triggered_pagination: MutexGuard<bool>) -> MutationResults {
+    pub fn get(&mut self) -> MutationResults {
         let mut result = MutationResults::default();
 
         // extract `page_size` updates from `updates_all` add them to `result`
@@ -267,7 +268,7 @@ impl MutationManager {
                 }
             } else {
                 // pagination is done
-                *triggered_pagination = false;
+                result.done = true;
                 break;
             }
         }

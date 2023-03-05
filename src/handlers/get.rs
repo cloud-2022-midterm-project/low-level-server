@@ -90,8 +90,15 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     {
         let mut mutations = state.mutations.lock().await;
         if !mutations.is_pagination_empty() {
-            let result = mutations.get(triggered_pagination);
+            let result = mutations.get();
+            // drop the lock so that other threads can access the mutations immediately
             drop(mutations);
+
+            // if the pagination is done, reset the flag
+            *triggered_pagination = !result.done;
+            // drop the locks so that other threads can access the flag immediately
+            drop(triggered_pagination);
+
             let body = serde_json::to_string(&result).unwrap();
             return response
                 .append_header(&format!("Content-Length: {}", body.len()))
@@ -137,7 +144,8 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
         *triggered_pagination = false;
     }
 
-    // drop the lock so that other threads can access the offset
+    // drop the locks so that other threads can access the flag and offset immediately
+    drop(triggered_pagination);
     drop(offset);
 
     let messages: Vec<CompleteMessage> = messages
