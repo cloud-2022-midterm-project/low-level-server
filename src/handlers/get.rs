@@ -93,7 +93,6 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
             let result = mutations.get();
             // drop the lock so that other threads can access the mutations immediately
             drop(mutations);
-
             // if the pagination is done, reset the flag
             *triggered_pagination = !result.done;
             // drop the locks so that other threads can access the flag immediately
@@ -105,7 +104,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
                 .body(&body)
                 .to_string();
         }
-    } // end of mutations lock
+    }
 
     // pagination in postgres
     let mut offset = state.db_pagination_offset.lock().await;
@@ -188,7 +187,7 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> String {
                 .body(body.as_str())
                 .to_string();
         }
-    } // end of mutations lock
+    }
 
     // count all rows in the database
     let count = match sqlx::query!(

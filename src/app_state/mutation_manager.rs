@@ -9,7 +9,6 @@ use crate::{
 };
 use ahash::AHashSet;
 use serde::Serialize;
-use tokio::sync::MutexGuard;
 
 #[derive(Serialize, Debug)]
 enum Kind {
