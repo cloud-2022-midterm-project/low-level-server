@@ -27,9 +27,10 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
     } = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(e) => {
+            let body = format!("{}", e);
             return response
                 .status_line("HTTP/1.1 400 BAD REQUEST")
-                .body(&format!("{}", e))
+                .body(&body)
                 .to_string();
         }
     };

@@ -1,7 +1,8 @@
-use std::io;
+use std::{io, path::PathBuf};
 
+#[derive(Clone)]
 pub struct ImageStore {
-    pub(crate) base_path: String,
+    pub(crate) base_path: PathBuf,
 }
 
 impl ImageStore {
@@ -9,11 +10,14 @@ impl ImageStore {
         Self {
             base_path: {
                 let path = std::env::var("IMAGES_BASE_PATH").expect("IMAGES_BASE_PATH must be set");
+                let path = std::path::Path::new(&path);
                 // check if this path directory exists
                 if !std::path::Path::new(&path).exists() {
-                    panic!("IMAGES_BASE_PATH directory does not exist, the given path is {path}.");
+                    panic!(
+                        "IMAGES_BASE_PATH directory does not exist, the given path is {path:#?}."
+                    );
                 }
-                path
+                path.to_path_buf()
             },
         }
     }
@@ -44,7 +48,7 @@ impl ImageStore {
         }
     }
 
-    pub(crate) fn file_path(&self, user_id: &str) -> std::path::PathBuf {
+    pub(crate) fn file_path(&self, user_id: &str) -> PathBuf {
         std::fs::canonicalize(&self.base_path)
             .expect("Base path is not a valid path")
             .join(user_id)

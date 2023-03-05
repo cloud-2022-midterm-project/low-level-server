@@ -6,13 +6,19 @@ use crate::{
     response::Response,
 };
 
-use self::{delete::handle_delete, get::handle_get, post::handle_post, put::handle_put};
+use self::{
+    delete::handle_delete,
+    get::{get_pagination_meta, handle_get},
+    post::handle_post,
+    put::handle_put,
+};
 
 mod delete;
 mod get;
 mod post;
 mod put;
 
+pub use get::{CompleteMessage, CompletePutUpdate, PaginationMetadata};
 pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -33,12 +39,36 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
 
     // if GET request, spawn a new task to handle it
     if matches!(request.method(), Method::Get) {
-        tokio::spawn(async move {
-            let response = handle_get(request, state).await;
-            if let Err(e) = stream.write_all(response.as_bytes()).await {
-                eprintln!("Failed to send response: {}", e);
+        let uri = request.uri().trim_start_matches("/api/messages");
+        match uri {
+            "/" | "" => {
+                tokio::spawn(async move {
+                    let response = handle_get(state).await;
+                    if let Err(e) = stream.write_all(response.as_bytes()).await {
+                        eprintln!("Failed to send response: {}", e);
+                    }
+                });
             }
-        });
+            "/trigger-pagination" => {
+                let response = get_pagination_meta(state).await;
+                if let Err(e) = stream.write_all(response.as_bytes()).await {
+                    eprintln!("Failed to send response: {}", e);
+                }
+            }
+            uri => {
+                // unknown GET request
+                let body = format!("GET uri not found, {}", uri);
+                let response = Response::new()
+                    .status_line("HTTP/1.1 404 NOT FOUND")
+                    .append_header(&format!("Content-Length: {}", body.len()))
+                    .append_header("Content-Type: text/plain")
+                    .body(&body)
+                    .to_string();
+                if let Err(e) = stream.write_all(response.as_bytes()).await {
+                    eprintln!("Failed to send response: {}", e);
+                }
+            }
+        }
         return;
     }
 

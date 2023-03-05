@@ -19,7 +19,8 @@ async fn main() {
     println!("Connecting to database...");
     let db_pool = Arc::new(
         match PgPoolOptions::new()
-            .max_connections(1)
+            .min_connections(90)
+            .max_connections(100)
             .connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL is not set"))
             .await
         {
@@ -47,10 +48,18 @@ async fn main() {
                 .expect("PORT must be a number"),
         ));
 
+        const PAGINATION_PAGE_SIZE: usize = 8;
+
         let state = Arc::new(AppState {
             pool: db_pool,
             image_store: ImageStore::new(),
-            mutations: Mutex::new(MutationManager::new()),
+            mutations: Mutex::new(MutationManager::new(
+                PAGINATION_PAGE_SIZE,
+                ImageStore::new(),
+            )),
+            pagination_page_size: PAGINATION_PAGE_SIZE,
+            db_pagination_offset: Mutex::new(0),
+            triggered_pagination: Mutex::new(false),
         });
 
         let listener = match TcpListener::bind(addr).await {
@@ -118,9 +127,7 @@ async fn main() {
     println!("Database connection closed.");
 
     // send shutdown signal to the tcp listener
-    shutdown_send
-        .send(())
-        .expect("Failed to send shutdown signal");
+    shutdown_send.send(()).ok();
 
     // wait for the tcp listener to finish
     tcp_listener_thread

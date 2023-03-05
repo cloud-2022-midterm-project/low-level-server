@@ -19,4 +19,7 @@ pub struct AppState {
     pub pool: Arc<PgPool>,
     pub image_store: ImageStore,
     pub mutations: Mutex<MutationManager>,
+    pub pagination_page_size: usize,
+    pub db_pagination_offset: Mutex<usize>,
+    pub triggered_pagination: Mutex<bool>,
 }
