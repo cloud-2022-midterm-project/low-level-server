@@ -41,19 +41,19 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
     if matches!(request.method(), Method::Get) {
         let uri = request.uri().trim_start_matches("/api/messages");
         match uri {
-            "/" | "" => {
+            "" | "/" => {
+                let response = get_pagination_meta(state).await;
+                if let Err(e) = stream.write_all(response.as_bytes()).await {
+                    eprintln!("Failed to send response: {}", e);
+                }
+            }
+            "/get-page" => {
                 tokio::spawn(async move {
                     let response = handle_get(state).await;
                     if let Err(e) = stream.write_all(response.as_bytes()).await {
                         eprintln!("Failed to send response: {}", e);
                     }
                 });
-            }
-            "/trigger-pagination" => {
-                let response = get_pagination_meta(state).await;
-                if let Err(e) = stream.write_all(response.as_bytes()).await {
-                    eprintln!("Failed to send response: {}", e);
-                }
             }
             uri => {
                 // unknown GET request
