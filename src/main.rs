@@ -43,6 +43,8 @@ async fn main() {
         .parse()
         .expect("PAGINATION_PAGE_SIZE must be a number");
 
+    // setting up the tcp listener
+
     // the state of the tcp listener server
     let state = Arc::new(AppState {
         pool: db_pool,
@@ -56,6 +58,7 @@ async fn main() {
         triggered_pagination: Mutex::new(false),
     });
 
+    // the address to bind to
     let addr = SocketAddr::from((
         [0, 0, 0, 0],
         std::env::var("PORT")
@@ -64,21 +67,24 @@ async fn main() {
             .expect("PORT must be a number"),
     ));
 
-    // the main task that handles the tcp listener
-    let listener_task = async move {
-        let listener = match TcpListener::bind(addr).await {
-            Ok(listener) => {
-                println!("Listening on {}", listener.local_addr().unwrap());
-                listener
-            }
-            Err(e) => {
-                eprintln!("Failed to bind to {}: {}", addr, e);
-                std::process::exit(1);
-            }
-        };
+    // the tcp listener
+    let listener = match TcpListener::bind(addr).await {
+        Ok(listener) => {
+            println!("Listening on {}", listener.local_addr().unwrap());
+            listener
+        }
+        Err(e) => {
+            eprintln!("Failed to bind to {}: {}", addr, e);
+            std::process::exit(1);
+        }
+    };
 
+    // the main task that listens for incoming HTTP requests
+    let listener_task = async move {
         loop {
+            // select between the listener accepting a new connection and the shutdown signal
             tokio::select! {
+                // a new connection has been accepted
                 result = listener.accept() => {
                     match result {
                         Ok((stream, _)) => {
@@ -89,6 +95,7 @@ async fn main() {
                         },
                     }
                 }
+                // the shutdown signal has been received
                 _ = shutdown_recv.recv() => {
                     break;
                 }
