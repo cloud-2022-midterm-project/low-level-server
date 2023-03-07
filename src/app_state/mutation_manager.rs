@@ -295,11 +295,15 @@ impl MutationManager {
         result
     }
 
-    // pub fn clear(&mut self) {
-    //     self.updates_post.clear();
-    //     self.updates_put.clear();
-    //     self.updates_delete.clear();
-    // }
+    pub fn clear(&mut self) {
+        self.updates_post.clear();
+        self.updates_put.clear();
+        self.updates_delete.clear();
+        self.updates_all.clear();
+        // remove all files under mutation_dir
+        std::fs::remove_dir_all(&self.mutation_dir).expect("Failed to remove mutation dir");
+        std::fs::create_dir_all(&self.mutation_dir).expect("Failed to create mutation dir");
+    }
 
     fn get_mutation_file_dir(&self, uuid: &str) -> PathBuf {
         std::path::Path::new(&self.mutation_dir).join(uuid)

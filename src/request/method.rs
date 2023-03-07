@@ -6,6 +6,7 @@ pub enum Method {
     Post,
     Put,
     Delete,
+    Patch,
 }
 
 impl Default for Method {
@@ -23,6 +24,7 @@ impl FromStr for Method {
             "POST" => Ok(Self::Post),
             "PUT" => Ok(Self::Put),
             "DELETE" => Ok(Self::Delete),
+            "PATCH" => Ok(Self::Patch),
             _ => Err("Invalid method"),
         }
     }

@@ -7,12 +7,14 @@ use crate::{
 };
 
 use self::{
+    clear::clear,
     delete::handle_delete,
     get::{get_pagination_meta, handle_get},
     post::handle_post,
     put::handle_put,
 };
 
+mod clear;
 mod delete;
 mod get;
 mod post;
@@ -74,6 +76,7 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
             let uuid = request.uri().trim_start_matches("/api/messages/");
             handle_delete(uuid, state).await
         }
+        Method::Patch => clear(state).await,
     };
 
     if let Err(e) = stream.write_all(response.as_bytes()).await {

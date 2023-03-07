@@ -1,11 +1,10 @@
+use crate::app_state::AppState;
 use std::sync::Arc;
 
-use crate::{app_state::AppState, response::Response};
+pub(crate) async fn clear(state: Arc<AppState>) -> String {
+    let mut response = crate::response::Response::new();
 
-pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
-    let mut response = Response::new();
-
-    let result = sqlx::query!("DELETE FROM messages WHERE uuid = $1", uuid)
+    let result = sqlx::query!("DELETE FROM messages")
         .execute(state.pool.as_ref())
         .await;
 
@@ -15,8 +14,8 @@ pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
                 response.set_status_line("HTTP/1.1 404 NOT FOUND");
             } else {
                 // remove from image store if it exists
-                state.image_store.remove(uuid).ok();
-                state.mutations.lock().await.add_delete(uuid);
+                state.image_store.clear();
+                state.mutations.lock().await.clear();
                 response.set_status_line("HTTP/1.1 204 NO CONTENT");
             }
         }

@@ -43,10 +43,7 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
     }
 
     let result = sqlx::query!(
-        "
-        INSERT INTO messages (uuid, author, message, likes, has_image)
-        VALUES ($1, $2, $3, $4, $5)
-        ",
+        "INSERT INTO messages (uuid, author, message, likes, has_image) VALUES ($1, $2, $3, $4, $5)",
         &uuid,
         &author,
         &message,

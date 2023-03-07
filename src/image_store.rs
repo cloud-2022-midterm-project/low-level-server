@@ -53,6 +53,11 @@ impl ImageStore {
             .expect("Base path is not a valid path")
             .join(user_id)
     }
+
+    pub(crate) fn clear(&self) {
+        std::fs::remove_dir_all(&self.base_path).expect("Failed to clear image store");
+        std::fs::create_dir_all(&self.base_path).expect("Failed to recreate image store");
+    }
 }
 
 impl Default for ImageStore {
