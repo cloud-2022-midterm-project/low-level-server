@@ -38,30 +38,34 @@ async fn main() {
     // channel to send shutdown signal to the tcp listener
     let (shutdown_send, mut shutdown_recv) = mpsc::unbounded_channel();
 
+    let pagination_page_size: usize = std::env::var("PAGINATION_PAGE_SIZE")
+        .expect("PAGINATION_PAGE_SIZE is not set")
+        .parse()
+        .expect("PAGINATION_PAGE_SIZE must be a number");
+
+    // the state of the tcp listener server
+    let state = Arc::new(AppState {
+        pool: db_pool,
+        image_store: ImageStore::new(),
+        mutations: Mutex::new(MutationManager::new(
+            pagination_page_size,
+            ImageStore::new(),
+        )),
+        pagination_page_size,
+        db_pagination_offset: Mutex::new(0),
+        triggered_pagination: Mutex::new(false),
+    });
+
+    let addr = SocketAddr::from((
+        [0, 0, 0, 0],
+        std::env::var("PORT")
+            .unwrap_or("3000".to_string())
+            .parse()
+            .expect("PORT must be a number"),
+    ));
+
     // the main task that handles the tcp listener
     let listener_task = async move {
-        let addr = SocketAddr::from((
-            [0, 0, 0, 0],
-            std::env::var("PORT")
-                .unwrap_or("3000".to_string())
-                .parse()
-                .expect("PORT must be a number"),
-        ));
-
-        const PAGINATION_PAGE_SIZE: usize = 64;
-
-        let state = Arc::new(AppState {
-            pool: db_pool,
-            image_store: ImageStore::new(),
-            mutations: Mutex::new(MutationManager::new(
-                PAGINATION_PAGE_SIZE,
-                ImageStore::new(),
-            )),
-            pagination_page_size: PAGINATION_PAGE_SIZE,
-            db_pagination_offset: Mutex::new(0),
-            triggered_pagination: Mutex::new(false),
-        });
-
         let listener = match TcpListener::bind(addr).await {
             Ok(listener) => {
                 println!("Listening on {}", listener.local_addr().unwrap());
