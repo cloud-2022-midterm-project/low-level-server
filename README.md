@@ -6,9 +6,7 @@ This is a low-level, destined to fail, overengineered server for cloud computing
 
 ### INSTALL RUST and cargo
 
-```bash
-https://www.rust-lang.org/tools/install
-```
+<https://www.rust-lang.org/tools/install>
 
 ### .env
 
