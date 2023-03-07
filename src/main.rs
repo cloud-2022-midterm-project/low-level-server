@@ -74,8 +74,7 @@ async fn main() {
             listener
         }
         Err(e) => {
-            eprintln!("Failed to bind to {}: {}", addr, e);
-            std::process::exit(1);
+            panic!("Failed to bind to {}: {}", addr, e);
         }
     };
 
