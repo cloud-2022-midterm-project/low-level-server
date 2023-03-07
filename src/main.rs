@@ -88,7 +88,7 @@ async fn main() {
                 result = listener.accept() => {
                     match result {
                         Ok((stream, _)) => {
-                            handle_connection(stream, Arc::clone(&state)).await;
+                            tokio::spawn(handle_connection(stream, Arc::clone(&state)));
                         }
                         Err(e) => {
                             eprintln!("Failed to accept connection: {}", e);

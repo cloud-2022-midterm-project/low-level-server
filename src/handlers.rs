@@ -37,73 +37,46 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
         }
     };
 
-    // if GET request, spawn a new task to handle it
-    if matches!(request.method(), Method::Get) {
-        let uri = request.uri().trim_start_matches("/api/messages");
-        match uri {
-            "" | "/" => {
-                let response = get_pagination_meta(state).await;
-                if let Err(e) = stream.write_all(response.as_bytes()).await {
-                    eprintln!("Failed to send response: {}", e);
-                }
-            }
-            "/get-page" => {
-                tokio::spawn(async move {
-                    let response = handle_get(state).await;
-                    if let Err(e) = stream.write_all(response.as_bytes()).await {
-                        eprintln!("Failed to send response: {}", e);
-                    }
-                });
-            }
-            uri => {
-                // unknown GET request
-                let body = format!("GET uri not found, {}", uri);
-                let response = Response::new()
-                    .status_line("HTTP/1.1 404 NOT FOUND")
-                    .append_header(&format!("Content-Length: {}", body.len()))
-                    .append_header("Content-Type: text/plain")
-                    .body(&body)
-                    .to_string();
-                if let Err(e) = stream.write_all(response.as_bytes()).await {
-                    eprintln!("Failed to send response: {}", e);
+    let response = match request.method() {
+        Method::Get => {
+            let uri = request.uri().trim_start_matches("/api/messages");
+            match uri {
+                "" | "/" => get_pagination_meta(state).await,
+                "/get-page" => handle_get(state).await,
+                uri => {
+                    // unknown GET request
+                    let body = format!("GET uri not found, {}", uri);
+                    Response::new()
+                        .status_line("HTTP/1.1 404 NOT FOUND")
+                        .append_header(&format!("Content-Length: {}", body.len()))
+                        .append_header("Content-Type: text/plain")
+                        .body(&body)
+                        .to_string()
                 }
             }
         }
-        return;
-    }
-
-    let response = process_request(request, state).await;
-
-    if let Err(e) = stream.write_all(response.as_bytes()).await {
-        eprintln!("Failed to send response: {}", e);
-    }
-}
-
-async fn process_request(request: Request, state: Arc<AppState>) -> String {
-    match request.method() {
-        // Method::Get => handle_get(state).await,
         Method::Post => match request.body() {
             Some(body) => handle_post(body, state).await,
             None => Response::new()
                 .status_line("HTTP/1.1 411 LENGTH REQUIRED")
                 .to_string(),
         },
-        Method::Put => {
-            let body = match request.body() {
-                Some(body) => body,
-                None => {
-                    return Response::new()
-                        .status_line("HTTP/1.1 411 LENGTH REQUIRED")
-                        .to_string();
-                }
-            };
-            let uuid = request.uri().trim_start_matches("/api/messages/");
-            handle_put(uuid, body, state).await
-        }
+        Method::Put => match request.body() {
+            Some(body) => {
+                let uuid = request.uri().trim_start_matches("/api/messages/");
+                handle_put(uuid, body, state).await
+            }
+            None => Response::new()
+                .status_line("HTTP/1.1 411 LENGTH REQUIRED")
+                .to_string(),
+        },
         Method::Delete => {
             let uuid = request.uri().trim_start_matches("/api/messages/");
             handle_delete(uuid, state).await
         }
-        Method::Get => unreachable!(),
+    };
+
+    if let Err(e) = stream.write_all(response.as_bytes()).await {
+        eprintln!("Failed to send response: {}", e);
     }
 }
