@@ -2,7 +2,7 @@
 
 pub mod app_state;
 mod handlers;
-pub mod image_store;
+pub mod image;
 mod maybe;
 mod models;
 mod request;

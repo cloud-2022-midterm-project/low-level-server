@@ -5,6 +5,7 @@ use serde_json::json;
 
 use crate::{
     app_state::{AppState, PutUpdate},
+    image,
     maybe::Maybe,
     models::Message,
     response::Response,
@@ -90,7 +91,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     {
         let mut mutations = state.mutations.lock().await;
         if !mutations.is_pagination_empty() {
-            let result = mutations.get();
+            let result = mutations.get(&state.image_base_path);
             // drop the lock so that other threads can access the mutations immediately
             drop(mutations);
             // if the pagination is done, reset the flag
@@ -152,7 +153,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
         .map(|m| {
             let image = {
                 match m.has_image {
-                    true => state.image_store.get(&m.uuid),
+                    true => image::get(&state.image_base_path, &m.uuid),
                     false => None,
                 }
             };

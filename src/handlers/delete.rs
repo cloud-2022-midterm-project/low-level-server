@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{app_state::AppState, response::Response};
+use crate::{app_state::AppState, image, response::Response};
 
 pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
@@ -15,7 +15,7 @@ pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
                 response.set_status_line("HTTP/1.1 404 NOT FOUND");
             } else {
                 // remove from image store if it exists
-                state.image_store.remove(uuid).ok();
+                image::remove(&state.image_base_path, uuid).ok();
                 state.mutations.lock().await.add_delete(uuid);
                 response.set_status_line("HTTP/1.1 204 NO CONTENT");
             }

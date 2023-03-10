@@ -1,4 +1,4 @@
-use crate::app_state::AppState;
+use crate::{app_state::AppState, image};
 use std::sync::Arc;
 
 pub(crate) async fn clear(state: Arc<AppState>) -> String {
@@ -10,7 +10,7 @@ pub(crate) async fn clear(state: Arc<AppState>) -> String {
 
     match result {
         Ok(_) => {
-            state.image_store.clear();
+            image::clear(&state.image_base_path).ok();
             state.mutations.lock().await.clear();
             response.set_status_line("HTTP/1.1 204 NO CONTENT");
         }

@@ -2,10 +2,10 @@ pub mod mutation_manager;
 
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::{handlers::PutMessage, image_store::ImageStore};
+use crate::handlers::PutMessage;
 
 use self::mutation_manager::MutationManager;
 
@@ -17,9 +17,9 @@ pub struct PutUpdate {
 
 pub struct AppState {
     pub pool: Arc<PgPool>,
-    pub image_store: ImageStore,
     pub mutations: Mutex<MutationManager>,
     pub pagination_page_size: usize,
     pub db_pagination_offset: Mutex<usize>,
     pub triggered_pagination: Mutex<bool>,
+    pub image_base_path: PathBuf,
 }

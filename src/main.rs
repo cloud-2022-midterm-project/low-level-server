@@ -2,7 +2,6 @@ use dotenv::dotenv;
 use server_low_level::{
     app_state::{mutation_manager::MutationManager, AppState},
     handle_connection,
-    image_store::ImageStore,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
@@ -48,14 +47,19 @@ async fn main() {
     // the state of the tcp listener server
     let state = Arc::new(AppState {
         pool: db_pool,
-        image_store: ImageStore::new(),
-        mutations: Mutex::new(MutationManager::new(
-            pagination_page_size,
-            ImageStore::new(),
-        )),
+        mutations: Mutex::new(MutationManager::new(pagination_page_size)),
         pagination_page_size,
         db_pagination_offset: Mutex::new(0),
         triggered_pagination: Mutex::new(false),
+        image_base_path: {
+            let path = std::env::var("IMAGES_BASE_PATH").expect("IMAGES_BASE_PATH must be set");
+            let path = std::path::Path::new(&path);
+            // check if this path directory exists
+            if !std::path::Path::new(&path).exists() {
+                panic!("IMAGES_BASE_PATH directory does not exist, the given path is {path:#?}.");
+            }
+            path.to_path_buf()
+        },
     });
 
     // the address to bind to

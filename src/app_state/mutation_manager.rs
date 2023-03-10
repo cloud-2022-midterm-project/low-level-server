@@ -3,7 +3,7 @@ use std::{fmt, path::PathBuf};
 use super::PutUpdate;
 use crate::{
     handlers::{BindValue, CompleteMessage, CompletePutUpdate, PaginationMetadata, PutMessage},
-    image_store::ImageStore,
+    image,
     maybe::Maybe,
     models::Message,
 };
@@ -68,11 +68,10 @@ pub struct MutationManager {
     mutation_dir: PathBuf,
     updates_all: Vec<Entry>,
     page_size: usize,
-    image_store: ImageStore,
 }
 
 impl MutationManager {
-    pub fn new(page_size: usize, image_store: ImageStore) -> Self {
+    pub fn new(page_size: usize) -> Self {
         Self {
             updates_post: AHashSet::with_capacity(512),
             updates_put: AHashSet::with_capacity(512),
@@ -91,7 +90,6 @@ impl MutationManager {
             },
             updates_all: Default::default(),
             page_size,
-            image_store,
         }
     }
 
@@ -232,7 +230,7 @@ impl MutationManager {
         PaginationMetadata::new(self.updates_all.len(), self.page_size)
     }
 
-    pub fn get(&mut self) -> MutationResults {
+    pub fn get(&mut self, image_base_path: &PathBuf) -> MutationResults {
         let mut result = MutationResults::default();
 
         // extract `page_size` updates from `updates_all` add them to `result`
@@ -246,7 +244,8 @@ impl MutationManager {
                         let message: Message = bincode::deserialize(&update)
                             .expect("Failed to parse post mutation file");
                         let image = match message.has_image {
-                            true => self.image_store.get(&entry.uuid),
+                            // true => self.image_store.get(&entry.uuid),
+                            true => image::get(image_base_path, &entry.uuid),
                             false => None,
                         };
                         let complete_message = CompleteMessage::new(message, image);
@@ -261,7 +260,7 @@ impl MutationManager {
                         let update: PutUpdate = bincode::deserialize(&update)
                             .expect("Failed to parse put mutation file");
                         let image = match update.fields.imageUpdate {
-                            Maybe::Value(true) => self.image_store.get(&entry.uuid),
+                            Maybe::Value(true) => image::get(image_base_path, &entry.uuid),
                             _ => None,
                         };
                         let complete_update = CompletePutUpdate::new(update, image);

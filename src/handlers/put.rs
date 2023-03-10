@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{app_state::AppState, maybe::Maybe, response::Response};
+use crate::{app_state::AppState, image, maybe::Maybe, response::Response};
 
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +64,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
         index += 1;
         if let Maybe::Value(image) = &payload.base64Image {
             // update image
-            if state.image_store.save(image, uuid).is_err() {
+            if image::save(&state.image_base_path, image, uuid).is_err() {
                 return response
                     .status_line("HTTP/1.1 500 Internal Server Error")
                     .body("Failed to save image.")
@@ -73,7 +73,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
             params.push(BindValue::HasImage(true));
         } else {
             // remove image
-            state.image_store.remove(uuid).ok();
+            image::remove(&state.image_base_path, uuid).ok();
             params.push(BindValue::HasImage(false));
         }
     }

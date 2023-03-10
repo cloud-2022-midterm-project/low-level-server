@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{app_state::AppState, models::Message, response::Response};
+use crate::{app_state::AppState, image, models::Message, response::Response};
 
 #[derive(Deserialize, Serialize)]
 pub struct PostMessage {
@@ -35,7 +35,7 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         }
     };
 
-    if imageUpdate && state.image_store.save(&base64Image, &uuid).is_err() {
+    if imageUpdate && image::save(&state.image_base_path, &base64Image, &uuid).is_err() {
         return response
             .status_line("HTTP/1.1 500 Internal Server Error")
             .body("Failed to save image.")
