@@ -107,8 +107,7 @@ impl MutationManager {
 
     pub fn add_post(&mut self, message: Message) {
         // save the message to the mutation directory
-        self.create_dir_all(&message.uuid);
-        let path = self.get_mutation_file_path(&message.uuid, Kind::Post);
+        let path = self.get_mutation_file_path(&message.uuid);
         std::fs::write(path, serde_json::to_string(&message).unwrap()).unwrap();
         self.updates_post.insert(message.uuid);
     }
@@ -124,12 +123,11 @@ impl MutationManager {
     }
 
     pub fn add_put(&mut self, uuid: &str, params: Vec<BindValue>) {
-        self.create_dir_all(uuid);
+        let path = self.get_mutation_file_path(uuid);
 
         // if there's a post update of this uuid, modify it rather than adding to updates_put
-        if let Some(id) = self.updates_post.get(uuid) {
+        if self.updates_post.get(uuid).is_some() {
             // get a file handle to the post mutation file
-            let path = self.get_mutation_file_path(id, Kind::Post);
             let file_content = std::fs::read_to_string(&path).unwrap();
 
             // read from the file into a message
@@ -150,8 +148,6 @@ impl MutationManager {
             std::fs::write(&path, serde_json::to_string(&message).unwrap()).unwrap();
         } else {
             // merge with existing update if it exists
-            let path = self.get_mutation_file_path(uuid, Kind::Put);
-
             // check if the file exists
             if self.updates_put.get(uuid).is_some() {
                 // if it's not empty, read the existing update and merge it with the new one
@@ -242,9 +238,9 @@ impl MutationManager {
         // extract `page_size` updates from `updates_all` add them to `result`
         for _ in 0..self.page_size {
             if let Some(entry) = self.updates_all.pop() {
+                let path = self.get_mutation_file_path(&entry.uuid);
                 match entry.kind {
                     Kind::Post => {
-                        let path = self.get_mutation_file_path(&entry.uuid, Kind::Post);
                         let update = std::fs::read_to_string(&path)
                             .expect("Failed to read post mutation file");
                         let message: Message = serde_json::from_str(&update)
@@ -258,12 +254,8 @@ impl MutationManager {
 
                         // remove the post mutation file
                         std::fs::remove_file(&path).expect("Failed to remove post mutation file");
-                        // remove dir as well
-                        std::fs::remove_dir_all(self.get_mutation_file_dir(&entry.uuid))
-                            .expect("Failed to remove post dir");
                     }
                     Kind::Put => {
-                        let path = self.get_mutation_file_path(&entry.uuid, Kind::Put);
                         let update = std::fs::read_to_string(&path)
                             .expect("Failed to read put mutation file");
                         let update: PutUpdate = serde_json::from_str(&update)
@@ -277,9 +269,6 @@ impl MutationManager {
 
                         // remove the put mutation file
                         std::fs::remove_file(&path).expect("Failed to remove put mutation file");
-                        // remove dir as well
-                        std::fs::remove_dir_all(self.get_mutation_file_dir(&entry.uuid))
-                            .expect("Failed to remove put dir");
                     }
                     Kind::Delete => {
                         result.deletes.push(entry.uuid);
@@ -305,18 +294,8 @@ impl MutationManager {
         std::fs::create_dir_all(&self.mutation_dir).expect("Failed to create mutation dir");
     }
 
-    fn get_mutation_file_dir(&self, uuid: &str) -> PathBuf {
+    fn get_mutation_file_path(&self, uuid: &str) -> PathBuf {
+        // mutation_dur/uuid
         std::path::Path::new(&self.mutation_dir).join(uuid)
-    }
-
-    /// Creates a directory for the mutation files
-    fn create_dir_all(&self, uuid: &str) {
-        std::fs::create_dir_all(self.get_mutation_file_dir(uuid))
-            .expect("Failed to create mutation directory");
-    }
-
-    fn get_mutation_file_path(&self, uuid: &str, kind: Kind) -> PathBuf {
-        self.get_mutation_file_dir(uuid)
-            .join(format!("{}.json", kind))
     }
 }
