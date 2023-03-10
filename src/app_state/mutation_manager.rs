@@ -108,7 +108,8 @@ impl MutationManager {
     pub fn add_post(&mut self, message: Message) {
         // save the message to the mutation directory
         let path = self.get_mutation_file_path(&message.uuid);
-        std::fs::write(path, serde_json::to_string(&message).unwrap()).unwrap();
+        let encoded = bincode::serialize(&message).unwrap();
+        std::fs::write(path, encoded).unwrap();
         self.updates_post.insert(message.uuid);
     }
 
@@ -127,12 +128,10 @@ impl MutationManager {
 
         // if there's a post update of this uuid, modify it rather than adding to updates_put
         if self.updates_post.get(uuid).is_some() {
-            // get a file handle to the post mutation file
-            let file_content = std::fs::read_to_string(&path).unwrap();
-
-            // read from the file into a message
+            // retrieve the message from the file
+            let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
             let mut message: Message =
-                serde_json::from_str(&file_content).expect("Failed to parse post mutation file");
+                bincode::deserialize(&file_content).expect("Failed to deserialize message");
 
             // update the message
             for param in params {
@@ -145,7 +144,8 @@ impl MutationManager {
             }
 
             // write back to the file
-            std::fs::write(&path, serde_json::to_string(&message).unwrap()).unwrap();
+            let encoded = bincode::serialize(&message).unwrap();
+            std::fs::write(&path, encoded).unwrap();
         } else {
             // merge with existing update if it exists
             // check if the file exists
@@ -153,9 +153,9 @@ impl MutationManager {
                 // if it's not empty, read the existing update and merge it with the new one
 
                 // read from the file into a message
-                let mut update: PutUpdate =
-                    serde_json::from_str(&std::fs::read_to_string(&path).unwrap())
-                        .expect("Failed to parse put mutation file");
+                let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
+                let mut update: PutUpdate = bincode::deserialize(&file_content)
+                    .expect("Failed to deserialize put mutation file");
 
                 // merge the updates
                 for param in params {
@@ -168,8 +168,8 @@ impl MutationManager {
                 }
 
                 // write back to the file
-                std::fs::write(&path, serde_json::to_string(&update).unwrap())
-                    .expect("Failed to write put mutation file");
+                let encoded = bincode::serialize(&update).unwrap();
+                std::fs::write(&path, encoded).unwrap();
                 return;
             }
 
@@ -189,10 +189,10 @@ impl MutationManager {
             };
 
             // file content
-            let content = serde_json::to_string(&update).unwrap();
+            let encoded = bincode::serialize(&update).unwrap();
 
             // write the update to the file
-            std::fs::write(&path, content).expect("Failed to write mutation file");
+            std::fs::write(&path, encoded).expect("Failed to write mutation file");
 
             // add to updates_put
             self.updates_put.insert(uuid.to_string());
@@ -241,9 +241,9 @@ impl MutationManager {
                 let path = self.get_mutation_file_path(&entry.uuid);
                 match entry.kind {
                     Kind::Post => {
-                        let update = std::fs::read_to_string(&path)
-                            .expect("Failed to read post mutation file");
-                        let message: Message = serde_json::from_str(&update)
+                        let update =
+                            std::fs::read(&path).expect("Failed to read post mutation file");
+                        let message: Message = bincode::deserialize(&update)
                             .expect("Failed to parse post mutation file");
                         let image = match message.has_image {
                             true => self.image_store.get(&entry.uuid),
@@ -256,9 +256,9 @@ impl MutationManager {
                         std::fs::remove_file(&path).expect("Failed to remove post mutation file");
                     }
                     Kind::Put => {
-                        let update = std::fs::read_to_string(&path)
-                            .expect("Failed to read put mutation file");
-                        let update: PutUpdate = serde_json::from_str(&update)
+                        let update =
+                            std::fs::read(&path).expect("Failed to read put mutation file");
+                        let update: PutUpdate = bincode::deserialize(&update)
                             .expect("Failed to parse put mutation file");
                         let image = match update.fields.imageUpdate {
                             Maybe::Value(true) => self.image_store.get(&entry.uuid),
