@@ -1,8 +1,9 @@
 use serde::{ser::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// serde Value that can be Absent, Null, or Value(T)
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum Maybe<T> {
+    #[default]
     Absent,
     Null,
     Value(T),
@@ -20,12 +21,6 @@ impl<T> Maybe<T> {
             Maybe::Null => Maybe::Null,
             Maybe::Value(v) => Maybe::Value(v),
         }
-    }
-}
-
-impl<T> Default for Maybe<T> {
-    fn default() -> Self {
-        Maybe::Absent
     }
 }
 
