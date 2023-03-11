@@ -155,7 +155,9 @@ impl MutationManager {
 
                 // read from the file into a message
                 let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
-                let mut update: PutUpdate = bincode::deserialize(&file_content)
+
+                // do not use `bincode` here because it fails with the `Maybe` type
+                let mut update: PutUpdate = serde_json::from_slice(&file_content)
                     .expect("Failed to deserialize put mutation file");
 
                 // merge the updates
@@ -190,7 +192,8 @@ impl MutationManager {
             };
 
             // file content
-            let encoded = bincode::serialize(&update).unwrap();
+            // do not use `bincode` here because it fails with the `Maybe` type
+            let encoded = serde_json::to_vec(&update).unwrap();
 
             // write the update to the file
             std::fs::write(&path, encoded).expect("Failed to write mutation file");
@@ -264,7 +267,8 @@ impl MutationManager {
                     Kind::Put => {
                         let update =
                             std::fs::read(&path).expect("Failed to read put mutation file");
-                        let update: PutUpdate = bincode::deserialize(&update)
+                        // do not use `bincode` here because it fails with the `Maybe` type
+                        let update: PutUpdate = serde_json::from_slice(&update)
                             .expect("Failed to parse put mutation file");
                         let image = match update.fields.imageUpdate {
                             Maybe::Value(true) => image::get(image_base_path, &entry.uuid),
