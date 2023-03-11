@@ -113,7 +113,7 @@ pub struct MutationManager {
 
 impl MutationManager {
     pub fn new(page_size: usize) -> Self {
-        Self {
+        let s = Self {
             updates_post: AHashSet::with_capacity(512),
             updates_put: AHashSet::with_capacity(512),
             updates_delete: Vec::with_capacity(512),
@@ -131,7 +131,9 @@ impl MutationManager {
             },
             updates_all: Default::default(),
             page_size,
-        }
+        };
+        MutationManager::clear_dir(&s.mutation_dir).ok();
+        s
     }
 
     pub fn is_pagination_empty(&self) -> bool {
@@ -312,9 +314,6 @@ impl MutationManager {
                         };
                         let complete_message = CompleteMessage::new(message, image);
                         result.posts.push(complete_message);
-
-                        // remove the post mutation file
-                        std::fs::remove_file(&path).expect("Failed to remove post mutation file");
                     }
                     Kind::Put => {
                         let update =
@@ -327,9 +326,6 @@ impl MutationManager {
                             put: Maybe::Value(complete_update),
                             delete: Maybe::Absent,
                         });
-
-                        // remove the put mutation file
-                        std::fs::remove_file(&path).expect("Failed to remove put mutation file");
                     }
                     Kind::Delete => {
                         result.puts_deletes.push(PutDeleteUpdate {
@@ -341,6 +337,10 @@ impl MutationManager {
             } else {
                 // pagination is done
                 result.done = true;
+                let dir = self.mutation_dir.clone();
+                tokio::spawn(async move {
+                    MutationManager::clear_dir(&dir).ok();
+                });
                 break;
             }
         }
@@ -353,9 +353,19 @@ impl MutationManager {
         self.updates_put.clear();
         self.updates_delete.clear();
         self.updates_all.clear();
+        MutationManager::clear_dir(&self.mutation_dir).ok();
+    }
+
+    fn clear_dir(dir: &PathBuf) -> std::io::Result<()> {
         // remove all files under mutation_dir
-        std::fs::remove_dir_all(&self.mutation_dir).expect("Failed to remove mutation dir");
-        std::fs::create_dir_all(&self.mutation_dir).expect("Failed to create mutation dir");
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                std::fs::remove_file(path)?;
+            }
+        }
+        Ok(())
     }
 
     fn get_mutation_file_path(&self, uuid: &str) -> PathBuf {
