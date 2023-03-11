@@ -1,18 +1,13 @@
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum Method {
+    #[default]
     Get,
     Post,
     Put,
     Delete,
     Patch,
-}
-
-impl Default for Method {
-    fn default() -> Self {
-        Self::Get
-    }
 }
 
 impl FromStr for Method {
