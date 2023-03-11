@@ -287,7 +287,6 @@ impl MutationManager {
                         // do not use `bincode` here because it fails with the `Maybe` type
                         let update: PutUpdate = serde_json::from_slice(&update)
                             .expect("Failed to parse put mutation file");
-                        dbg!(&update.fields);
                         let image = match update.fields.imageUpdate {
                             Maybe::Value(true) => {
                                 image::get(image_base_path, &entry.uuid).or(Some("".to_owned()))
