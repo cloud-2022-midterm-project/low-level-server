@@ -219,6 +219,9 @@ impl MutationManager {
             })
             .collect();
         self.updates_all.extend(posts);
+
+        let mut puts_deletes =
+            Vec::with_capacity(self.updates_put.len() + self.updates_delete.len());
         let puts: Vec<_> = self
             .updates_put
             .drain()
@@ -227,7 +230,7 @@ impl MutationManager {
                 uuid,
             })
             .collect();
-        self.updates_all.extend(puts);
+        puts_deletes.extend(puts);
         let del: Vec<_> = self
             .updates_delete
             .iter()
@@ -237,10 +240,12 @@ impl MutationManager {
             })
             .collect();
         self.updates_delete.clear();
-        self.updates_all.extend(del);
+        puts_deletes.extend(del);
 
-        // sort by uuid
-        self.updates_all.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+        // sort puts_deletes by uuid
+        puts_deletes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+
+        self.updates_all.extend(puts_deletes);
 
         PaginationMetadata::new(
             self.updates_all.len(),
