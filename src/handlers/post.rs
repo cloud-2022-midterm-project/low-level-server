@@ -78,8 +78,6 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
             response.set_status_line("HTTP/1.1 201 OK");
         }
         Err(_) => {
-            // response.push_str("HTTP/1.1 409 CONFLICT\r\n\r\n");
-            // response.push_str(&format!("{}", e));
             response.set_status_line("HTTP/1.1 409 CONFLICT");
         }
     }
