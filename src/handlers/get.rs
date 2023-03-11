@@ -15,10 +15,9 @@ use crate::{
 pub struct CompleteMessage {
     uuid: String,
     author: String,
-    message: String,
+    message: Option<String>,
     likes: i32,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    base64Image: Maybe<String>,
+    image: Option<String>,
 }
 
 impl CompleteMessage {
@@ -26,10 +25,7 @@ impl CompleteMessage {
         CompleteMessage {
             uuid: message.uuid,
             author: message.author,
-            base64Image: match image {
-                Some(image) => Maybe::Value(image),
-                None => Maybe::Absent,
-            },
+            image,
             likes: message.likes,
             message: message.message,
         }
@@ -46,7 +42,7 @@ pub struct CompletePutUpdate {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     likes: Maybe<i32>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    base64Image: Maybe<String>,
+    image: Maybe<String>,
 }
 
 impl CompletePutUpdate {
@@ -56,7 +52,7 @@ impl CompletePutUpdate {
             author: update.fields.author,
             message: update.fields.message,
             likes: update.fields.likes,
-            base64Image: match image {
+            image: match image {
                 Some(image) => Maybe::Value(image),
                 None => Maybe::Absent,
             },

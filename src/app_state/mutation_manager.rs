@@ -138,7 +138,7 @@ impl MutationManager {
             for param in params {
                 match param {
                     BindValue::Author(v) => message.author = v.to_string(),
-                    BindValue::Message(v) => message.message = v.to_string(),
+                    BindValue::Message(v) => message.message = Some(v.to_string()),
                     BindValue::Likes(v) => message.likes = v,
                     BindValue::HasImage(v) => message.has_image = v,
                 }

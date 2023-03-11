@@ -22,7 +22,7 @@ pub struct PutMessage {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     pub imageUpdate: Maybe<bool>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub base64Image: Maybe<String>,
+    pub image: Maybe<String>,
 }
 
 pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String {
@@ -62,7 +62,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     if let Maybe::Value(true) = payload.imageUpdate {
         command.push_str(&format!("has_image = ${index}, "));
         index += 1;
-        if let Maybe::Value(image) = &payload.base64Image {
+        if let Maybe::Value(image) = &payload.image {
             // update image
             if image::save(&state.image_base_path, image, uuid).is_err() {
                 return response

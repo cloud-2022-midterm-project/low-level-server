@@ -8,10 +8,10 @@ use crate::{app_state::AppState, image, models::Message, response::Response};
 pub struct PostMessage {
     uuid: String,
     author: String,
-    message: String,
+    message: Option<String>,
     likes: i32,
     imageUpdate: bool,
-    base64Image: String,
+    image: Option<String>,
 }
 
 pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
@@ -23,11 +23,11 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         message,
         likes,
         imageUpdate,
-        base64Image,
+        image,
     } = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(e) => {
-            let body = format!("{}", e);
+            let body = format!("{e} {body}");
             return response
                 .status_line("HTTP/1.1 400 BAD REQUEST")
                 .body(&body)
@@ -35,21 +35,34 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         }
     };
 
-    if imageUpdate && image::save(&state.image_base_path, &base64Image, &uuid).is_err() {
-        return response
-            .status_line("HTTP/1.1 500 Internal Server Error")
-            .body("Failed to save image.")
-            .to_string();
+    if let (true, Some(image)) = (imageUpdate, image) {
+        if image::save(&state.image_base_path, &image, &uuid).is_err() {
+            return response
+                .status_line("HTTP/1.1 500 Internal Server Error")
+                .body("Failed to save image.")
+                .to_string();
+        }
     }
 
-    let result = sqlx::query!(
-        "INSERT INTO messages (uuid, author, message, likes, has_image) VALUES ($1, $2, $3, $4, $5)",
-        &uuid,
-        &author,
-        &message,
-        &likes,
-        imageUpdate
-    )
+    let result = match &message {
+        Some(message) => sqlx::query!(
+            "INSERT INTO messages (uuid, author, message, likes, has_image) VALUES ($1, $2, $3, $4, $5)",
+            &uuid,
+            &author,
+            &message,
+            &likes,
+            imageUpdate
+        ),
+        None => {
+            sqlx::query!(
+                "INSERT INTO messages (uuid, author, likes, has_image) VALUES ($1, $2, $3, $4)",
+                &uuid,
+                &author,
+                &likes,
+                imageUpdate
+            )
+        },
+    }
     .execute(state.pool.as_ref())
     .await;
 
