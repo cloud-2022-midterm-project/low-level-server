@@ -147,6 +147,7 @@ impl MutationManager {
                     BindValue::Message(v) => message.message = Some(v.to_string()),
                     BindValue::Likes(v) => message.likes = v,
                     BindValue::HasImage(v) => message.has_image = v,
+                    BindValue::ImageUpdate(_) => (),
                 }
             }
 
@@ -172,7 +173,8 @@ impl MutationManager {
                         BindValue::Author(v) => update.fields.author = Maybe::Value(v),
                         BindValue::Message(v) => update.fields.message = Maybe::Value(v),
                         BindValue::Likes(v) => update.fields.likes = Maybe::Value(v),
-                        BindValue::HasImage(v) => update.fields.imageUpdate = Maybe::Value(v),
+                        BindValue::ImageUpdate(v) => update.fields.imageUpdate = Maybe::Value(v),
+                        BindValue::HasImage(_) => (),
                     }
                 }
 
@@ -189,7 +191,8 @@ impl MutationManager {
                     BindValue::Author(v) => fields.author = Maybe::Value(v),
                     BindValue::Message(v) => fields.message = Maybe::Value(v),
                     BindValue::Likes(v) => fields.likes = Maybe::Value(v),
-                    BindValue::HasImage(v) => fields.imageUpdate = Maybe::Value(v),
+                    BindValue::ImageUpdate(v) => fields.imageUpdate = Maybe::Value(v),
+                    BindValue::HasImage(_) => (),
                 }
             }
             let update = PutUpdate {
@@ -284,8 +287,11 @@ impl MutationManager {
                         // do not use `bincode` here because it fails with the `Maybe` type
                         let update: PutUpdate = serde_json::from_slice(&update)
                             .expect("Failed to parse put mutation file");
+                        dbg!(&update.fields);
                         let image = match update.fields.imageUpdate {
-                            Maybe::Value(true) => image::get(image_base_path, &entry.uuid),
+                            Maybe::Value(true) => {
+                                image::get(image_base_path, &entry.uuid).or(Some("".to_owned()))
+                            }
                             _ => None,
                         };
                         let complete_update = CompletePutUpdate::new(update, image);

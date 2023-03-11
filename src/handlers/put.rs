@@ -9,9 +9,10 @@ pub enum BindValue {
     Message(String),
     Likes(i32),
     HasImage(bool),
+    ImageUpdate(bool),
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize, Default, Debug)]
 pub struct PutMessage {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     pub author: Maybe<String>,
@@ -60,6 +61,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     }
 
     if let Maybe::Value(true) = payload.imageUpdate {
+        params.push(BindValue::ImageUpdate(true));
         command.push_str(&format!("has_image = ${index}, "));
         index += 1;
         if let Maybe::Value(image) = &payload.image {
@@ -92,11 +94,12 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     let mut q = sqlx::query(&command);
 
     for param in params.iter() {
-        q = match param {
-            BindValue::Author(v) => q.bind(v),
-            BindValue::Message(v) => q.bind(v),
-            BindValue::Likes(v) => q.bind(v),
-            BindValue::HasImage(v) => q.bind(v),
+        match param {
+            BindValue::Author(v) => q = q.bind(v),
+            BindValue::Message(v) => q = q.bind(v),
+            BindValue::Likes(v) => q = q.bind(v),
+            BindValue::HasImage(v) => q = q.bind(v),
+            _ => (),
         };
     }
 
