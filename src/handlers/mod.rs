@@ -20,7 +20,7 @@ mod get;
 mod post;
 mod put;
 
-pub use get::{CompleteMessage, CompletePutUpdate, PaginationMetadata};
+pub use get::{CompleteMessage, CompletePutUpdate, PaginationMetadata, PaginationType};
 pub use put::{BindValue, PutMessage};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 

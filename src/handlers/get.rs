@@ -64,15 +64,25 @@ impl CompletePutUpdate {
     }
 }
 
+#[derive(Serialize, Debug)]
+pub enum PaginationType {
+    #[serde(rename = "cache")]
+    Cache,
+    #[serde(rename = "fresh")]
+    Fresh,
+}
+
 #[derive(Serialize)]
 pub struct PaginationMetadata {
     total_pages: usize,
+    kind: PaginationType,
 }
 
 impl PaginationMetadata {
-    pub fn new(count_all: usize, page_size: usize) -> Self {
+    pub fn new(count_all: usize, page_size: usize, kind: PaginationType) -> Self {
         PaginationMetadata {
             total_pages: (count_all / page_size) + 1,
+            kind,
         }
     }
 }
@@ -205,7 +215,7 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> String {
         }
     };
 
-    let meta = PaginationMetadata::new(count, state.pagination_page_size);
+    let meta = PaginationMetadata::new(count, state.pagination_page_size, PaginationType::Fresh);
     let body = serde_json::to_string(&meta).unwrap();
     response
         .status_line("HTTP/1.1 200 OK")

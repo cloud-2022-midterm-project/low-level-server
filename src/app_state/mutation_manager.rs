@@ -2,7 +2,10 @@ use std::{fmt, path::PathBuf};
 
 use super::PutUpdate;
 use crate::{
-    handlers::{BindValue, CompleteMessage, CompletePutUpdate, PaginationMetadata, PutMessage},
+    handlers::{
+        BindValue, CompleteMessage, CompletePutUpdate, PaginationMetadata, PaginationType,
+        PutMessage,
+    },
     image,
     maybe::Maybe,
     models::Message,
@@ -227,7 +230,11 @@ impl MutationManager {
         self.updates_delete.clear();
         self.updates_all.extend(del);
 
-        PaginationMetadata::new(self.updates_all.len(), self.page_size)
+        PaginationMetadata::new(
+            self.updates_all.len(),
+            self.page_size,
+            PaginationType::Cache,
+        )
     }
 
     pub fn get(&mut self, image_base_path: &PathBuf) -> MutationResults {
