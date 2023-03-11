@@ -40,20 +40,26 @@ pub struct Entry {
 }
 
 #[derive(Serialize, Debug)]
+pub struct PutDeleteUpdate {
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    put: Maybe<CompletePutUpdate>,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    delete: Maybe<String>,
+}
+
+#[derive(Serialize, Debug)]
 pub struct MutationResults {
     pub posts: Vec<CompleteMessage>,
-    pub puts: Vec<CompletePutUpdate>,
-    pub deletes: Vec<String>,
+    pub puts_deletes: Vec<PutDeleteUpdate>,
     pub done: bool,
 }
 
 impl MutationResults {
     pub fn new() -> Self {
         Self {
-            deletes: Vec::with_capacity(16),
             done: false,
-            posts: Vec::with_capacity(16),
-            puts: Vec::with_capacity(16),
+            posts: Vec::with_capacity(32),
+            puts_deletes: Vec::with_capacity(32),
         }
     }
 }
@@ -119,7 +125,7 @@ impl MutationManager {
         self.updates_put.remove(uuid);
 
         // remove from updates_post if it exists
-        if self.updates_post.remove(uuid) {
+        if !self.updates_post.remove(uuid) {
             self.updates_delete.push(uuid.to_string());
         }
     }
@@ -233,6 +239,9 @@ impl MutationManager {
         self.updates_delete.clear();
         self.updates_all.extend(del);
 
+        // sort by uuid
+        self.updates_all.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+
         PaginationMetadata::new(
             self.updates_all.len(),
             self.page_size,
@@ -275,13 +284,19 @@ impl MutationManager {
                             _ => None,
                         };
                         let complete_update = CompletePutUpdate::new(update, image);
-                        result.puts.push(complete_update);
+                        result.puts_deletes.push(PutDeleteUpdate {
+                            put: Maybe::Value(complete_update),
+                            delete: Maybe::Absent,
+                        });
 
                         // remove the put mutation file
                         std::fs::remove_file(&path).expect("Failed to remove put mutation file");
                     }
                     Kind::Delete => {
-                        result.deletes.push(entry.uuid);
+                        result.puts_deletes.push(PutDeleteUpdate {
+                            put: Maybe::Absent,
+                            delete: Maybe::Value(entry.uuid),
+                        });
                     }
                 }
             } else {
