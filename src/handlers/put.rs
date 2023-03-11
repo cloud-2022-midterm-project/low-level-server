@@ -10,6 +10,7 @@ pub enum BindValue {
     Likes(i32),
     HasImage(bool),
     ImageUpdate(bool),
+    Image(String),
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -64,15 +65,16 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
         params.push(BindValue::ImageUpdate(true));
         command.push_str(&format!("has_image = ${index}, "));
         index += 1;
-        if let Maybe::Value(image) = &payload.image {
+        if let Maybe::Value(image) = payload.image {
             // update image
-            if image::save(&state.image_base_path, image, uuid).is_err() {
+            if image::save(&state.image_base_path, &image, uuid).is_err() {
                 return response
                     .status_line("HTTP/1.1 500 Internal Server Error")
                     .body("Failed to save image.")
                     .to_string();
             }
             params.push(BindValue::HasImage(true));
+            params.push(BindValue::Image(image));
         } else {
             // remove image
             image::remove(&state.image_base_path, uuid).ok();

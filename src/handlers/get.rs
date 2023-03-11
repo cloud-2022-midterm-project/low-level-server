@@ -3,21 +3,15 @@ use std::sync::Arc;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::{
-    app_state::{AppState, PutUpdate},
-    image,
-    maybe::Maybe,
-    models::Message,
-    response::Response,
-};
+use crate::{app_state::AppState, image, models::Message, response::Response};
 
 #[derive(Serialize, Debug)]
 pub struct CompleteMessage {
-    uuid: String,
-    author: String,
-    message: Option<String>,
-    likes: i32,
-    image: Option<String>,
+    pub uuid: String,
+    pub author: String,
+    pub message: Option<String>,
+    pub likes: i32,
+    pub image: Option<String>,
 }
 
 impl CompleteMessage {
@@ -28,34 +22,6 @@ impl CompleteMessage {
             image,
             likes: message.likes,
             message: message.message,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct CompletePutUpdate {
-    uuid: String,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    author: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    message: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    likes: Maybe<i32>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    image: Maybe<String>,
-}
-
-impl CompletePutUpdate {
-    pub fn new(update: PutUpdate, image: Option<String>) -> Self {
-        CompletePutUpdate {
-            uuid: update.uuid,
-            author: update.fields.author,
-            message: update.fields.message,
-            likes: update.fields.likes,
-            image: match image {
-                Some(image) => Maybe::Value(image),
-                None => Maybe::Absent,
-            },
         }
     }
 }

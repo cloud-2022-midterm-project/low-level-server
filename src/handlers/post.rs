@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{app_state::AppState, image, models::Message, response::Response};
+use crate::{app_state::AppState, image, response::Response};
+
+use super::CompleteMessage;
 
 #[derive(Deserialize, Serialize)]
 pub struct PostMessage {
@@ -35,8 +37,8 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         }
     };
 
-    if let (true, Some(image)) = (imageUpdate, image) {
-        if image::save(&state.image_base_path, &image, &uuid).is_err() {
+    if let (true, Some(image)) = (imageUpdate, &image) {
+        if image::save(&state.image_base_path, image, &uuid).is_err() {
             return response
                 .status_line("HTTP/1.1 500 Internal Server Error")
                 .body("Failed to save image.")
@@ -68,12 +70,12 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
 
     match result {
         Ok(_) => {
-            state.mutations.lock().await.add_post(Message {
+            state.mutations.lock().await.add_post(CompleteMessage {
                 uuid,
                 author,
                 message,
                 likes,
-                has_image: imageUpdate,
+                image,
             });
             response.set_status_line("HTTP/1.1 201 OK");
         }

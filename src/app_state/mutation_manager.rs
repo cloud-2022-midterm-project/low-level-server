@@ -2,10 +2,7 @@ use std::{fmt, path::PathBuf};
 
 use super::PutUpdate;
 use crate::{
-    handlers::{
-        BindValue, CompleteMessage, CompletePutUpdate, PaginationMetadata, PaginationType,
-        PutMessage,
-    },
+    handlers::{BindValue, CompleteMessage, PaginationMetadata, PaginationType, PutMessage},
     image,
     maybe::Maybe,
     models::Message,
@@ -70,6 +67,41 @@ impl Default for MutationResults {
     }
 }
 
+#[derive(Serialize, Debug)]
+pub struct CompletePutUpdate {
+    uuid: String,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    author: Maybe<String>,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    message: Maybe<String>,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    likes: Maybe<i32>,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    image: Maybe<String>,
+}
+
+impl CompletePutUpdate {
+    pub fn new(update: PutUpdate) -> Self {
+        Self {
+            uuid: update.uuid,
+            author: update.fields.author,
+            message: update.fields.message,
+            likes: update.fields.likes,
+            image: match update.fields.imageUpdate {
+                // Deciding if an image is updated with new content or it is removed
+                Maybe::Value(true) => {
+                    if let Maybe::Value(image) = update.fields.image {
+                        Maybe::Value(image)
+                    } else {
+                        Maybe::Value(String::new()) // tell the client to remove the image by sending an empty string
+                    }
+                }
+                _ => Maybe::Absent,
+            },
+        }
+    }
+}
+
 pub struct MutationManager {
     updates_post: AHashSet<String>,
     updates_put: AHashSet<String>,
@@ -112,7 +144,7 @@ impl MutationManager {
             && self.updates_delete.is_empty()
     }
 
-    pub fn add_post(&mut self, message: Message) {
+    pub fn add_post(&mut self, message: CompleteMessage) {
         // save the message to the mutation directory
         let path = self.get_mutation_file_path(&message.uuid);
         let encoded = bincode::serialize(&message).unwrap();
@@ -148,6 +180,7 @@ impl MutationManager {
                     BindValue::Likes(v) => message.likes = v,
                     BindValue::HasImage(v) => message.has_image = v,
                     BindValue::ImageUpdate(_) => (),
+                    BindValue::Image(_) => (),
                 }
             }
 
@@ -175,6 +208,7 @@ impl MutationManager {
                         BindValue::Likes(v) => update.fields.likes = Maybe::Value(v),
                         BindValue::ImageUpdate(v) => update.fields.imageUpdate = Maybe::Value(v),
                         BindValue::HasImage(_) => (),
+                        BindValue::Image(v) => update.fields.image = Maybe::Value(v),
                     }
                 }
 
@@ -193,6 +227,7 @@ impl MutationManager {
                     BindValue::Likes(v) => fields.likes = Maybe::Value(v),
                     BindValue::ImageUpdate(v) => fields.imageUpdate = Maybe::Value(v),
                     BindValue::HasImage(_) => (),
+                    BindValue::Image(v) => fields.image = Maybe::Value(v),
                 }
             }
             let update = PutUpdate {
@@ -287,13 +322,7 @@ impl MutationManager {
                         // do not use `bincode` here because it fails with the `Maybe` type
                         let update: PutUpdate = serde_json::from_slice(&update)
                             .expect("Failed to parse put mutation file");
-                        let image = match update.fields.imageUpdate {
-                            Maybe::Value(true) => {
-                                image::get(image_base_path, &entry.uuid).or(Some("".to_owned()))
-                            }
-                            _ => None,
-                        };
-                        let complete_update = CompletePutUpdate::new(update, image);
+                        let complete_update = CompletePutUpdate::new(update);
                         result.puts_deletes.push(PutDeleteUpdate {
                             put: Maybe::Value(complete_update),
                             delete: Maybe::Absent,
