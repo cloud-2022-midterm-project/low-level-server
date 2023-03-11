@@ -92,7 +92,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     if !*triggered_pagination {
         return Response::new()
             .status_line("HTTP/1.1 403 Forbidden")
-            .body("Pagination not triggered yet. Request GET /trigger-pagination first and then, concurrently, GET / for a number of times equal to the total_pages value in the response of the previous request.")
+            .body("Pagination not triggered yet.")
             .to_string();
     }
 
