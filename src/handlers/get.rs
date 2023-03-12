@@ -162,21 +162,7 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> String {
         }
     }
 
-    // count all rows in the database
-    let count = match sqlx::query!("SELECT COUNT(*) as count FROM messages")
-        .fetch_one(state.pool.as_ref())
-        .await
-    {
-        Ok(v) => v.count.unwrap() as usize,
-        Err(e) => {
-            eprintln!("Error while counting messages: {}", e);
-            return response
-                .status_line("HTTP/1.1 500 Internal Server Error")
-                .body("Internal Server Error")
-                .to_string();
-        }
-    };
-
+    let count = state.all_uuids.lock().await.len();
     let meta = PaginationMetadata::new(count, state.pagination_page_size, PaginationType::Fresh);
     let body = serde_json::to_string(&meta).unwrap();
     response
