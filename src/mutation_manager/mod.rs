@@ -1,12 +1,9 @@
 use crate::{
-    app_state::PutUpdate,
-    handlers::{BindValue, CompleteMessage, PaginationMetadata, PaginationType, PutMessage},
-    image,
+    handlers::{CompleteMessage, PaginationMetadata, PaginationType},
     maybe::Maybe,
-    models::Message,
 };
 use ahash::AHashSet;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt, path::PathBuf};
 
 #[derive(Serialize, Debug)]
@@ -38,7 +35,7 @@ pub struct Entry {
 #[derive(Serialize, Debug)]
 pub struct PutDeleteUpdate {
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    put: Maybe<CompletePutUpdate>,
+    put: Maybe<ClientPutUpdate>,
     #[serde(default, skip_serializing_if = "Maybe::is_absent")]
     delete: Maybe<String>,
 }
@@ -66,37 +63,57 @@ impl Default for MutationResults {
     }
 }
 
-#[derive(Serialize, Debug)]
-pub struct CompletePutUpdate {
-    uuid: String,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    author: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    message: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    likes: Maybe<i32>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    image: Maybe<String>,
+#[derive(Serialize, Debug, Deserialize)]
+/// The update that is saved to the mutation directory
+pub struct ServerPutUpdate {
+    pub author: String,
+    pub message: String,
+    pub likes: i32,
+    pub image_updated: bool,
+    pub image: Option<String>,
 }
 
-impl CompletePutUpdate {
-    pub fn new(update: PutUpdate) -> Self {
+impl ServerPutUpdate {
+    fn update(&mut self, other: ServerPutUpdate) {
+        self.author = other.author;
+        self.message = other.message;
+        self.likes = other.likes;
+        self.image_updated = other.image_updated || self.image_updated;
+        if other.image_updated {
+            self.image = other.image;
+        };
+    }
+}
+
+#[derive(Serialize, Debug, Deserialize)]
+/// The update that the client sees.
+pub struct ClientPutUpdate {
+    pub uuid: String,
+    pub author: String,
+    pub message: String,
+    pub likes: i32,
+    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
+    pub image: Maybe<String>,
+}
+
+impl ClientPutUpdate {
+    fn new(uuid: String, update: ServerPutUpdate) -> Self {
+        let image = if update.image_updated {
+            if let Some(image) = update.image {
+                Maybe::Value(image)
+            } else {
+                // image is removed
+                Maybe::Value("".to_string())
+            }
+        } else {
+            Maybe::Absent
+        };
         Self {
-            uuid: update.uuid,
-            author: update.fields.author,
-            message: update.fields.message,
-            likes: update.fields.likes,
-            image: match update.fields.imageUpdate {
-                // Deciding if an image is updated with new content or it is removed
-                Maybe::Value(true) => {
-                    if let Maybe::Value(image) = update.fields.image {
-                        Maybe::Value(image)
-                    } else {
-                        Maybe::Value(String::new()) // tell the client to remove the image by sending an empty string
-                    }
-                }
-                _ => Maybe::Absent,
-            },
+            author: update.author,
+            likes: update.likes,
+            message: update.message,
+            image,
+            uuid,
         }
     }
 }
@@ -163,89 +180,43 @@ impl MutationManager {
         }
     }
 
-    pub fn add_put(&mut self, uuid: &str, params: Vec<BindValue>) {
-        let path = self.get_mutation_file_path(uuid);
+    pub fn add_put(&mut self, uuid: &str, put: ServerPutUpdate) {
+        let path = self.get_mutation_file_path(&uuid);
 
         // if there's a post update of this uuid, modify it rather than adding to updates_put
-        if self.updates_post.get(uuid).is_some() {
+        if self.updates_post.contains(uuid) {
             // retrieve the message from the file
             let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
-            let mut message: Message =
+            let mut message: CompleteMessage =
                 bincode::deserialize(&file_content).expect("Failed to deserialize message");
 
-            // update the message
-            for param in params {
-                match param {
-                    BindValue::Author(v) => message.author = v.to_string(),
-                    BindValue::Message(v) => message.message = Some(v.to_string()),
-                    BindValue::Likes(v) => message.likes = v,
-                    BindValue::HasImage(v) => message.has_image = v,
-                    BindValue::ImageUpdate(_) => (),
-                    BindValue::Image(_) => (),
-                }
-            }
+            // overwrite the message with the new values
+            message.update(put);
 
             // write back to the file
             let encoded = bincode::serialize(&message).unwrap();
             std::fs::write(&path, encoded).unwrap();
-        } else {
-            // merge with existing update if it exists
-            // check if the file exists
-            if self.updates_put.get(uuid).is_some() {
-                // if it's not empty, read the existing update and merge it with the new one
-
-                // read from the file into a message
-                let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
-
-                // do not use `bincode` here because it fails with the `Maybe` type
-                let mut update: PutUpdate = serde_json::from_slice(&file_content)
-                    .expect("Failed to deserialize put mutation file");
-
-                // merge the updates
-                for param in params {
-                    match param {
-                        BindValue::Author(v) => update.fields.author = Maybe::Value(v),
-                        BindValue::Message(v) => update.fields.message = Maybe::Value(v),
-                        BindValue::Likes(v) => update.fields.likes = Maybe::Value(v),
-                        BindValue::ImageUpdate(v) => update.fields.imageUpdate = Maybe::Value(v),
-                        BindValue::HasImage(_) => (),
-                        BindValue::Image(v) => update.fields.image = Maybe::Value(v),
-                    }
-                }
-
-                // write back to the file
-                let encoded = bincode::serialize(&update).unwrap();
-                std::fs::write(&path, encoded).unwrap();
-                return;
-            }
-
-            // if it is empty, create a new update
-            let mut fields = PutMessage::default();
-            for param in params {
-                match param {
-                    BindValue::Author(v) => fields.author = Maybe::Value(v),
-                    BindValue::Message(v) => fields.message = Maybe::Value(v),
-                    BindValue::Likes(v) => fields.likes = Maybe::Value(v),
-                    BindValue::ImageUpdate(v) => fields.imageUpdate = Maybe::Value(v),
-                    BindValue::HasImage(_) => (),
-                    BindValue::Image(v) => fields.image = Maybe::Value(v),
-                }
-            }
-            let update = PutUpdate {
-                uuid: uuid.to_string(),
-                fields,
-            };
-
-            // file content
-            // do not use `bincode` here because it fails with the `Maybe` type
-            let encoded = serde_json::to_vec(&update).unwrap();
-
-            // write the update to the file
-            std::fs::write(&path, encoded).expect("Failed to write mutation file");
-
-            // add to updates_put
-            self.updates_put.insert(uuid.to_string());
+            return;
         }
+
+        if self.updates_put.contains(uuid) {
+            // retrieve the message from the file
+            let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
+            let mut update: ServerPutUpdate =
+                bincode::deserialize(&file_content).expect("Failed to deserialize message");
+            update.update(put);
+            // write back to the file
+            let encoded = bincode::serialize(&update).unwrap();
+            std::fs::write(&path, encoded).unwrap();
+            return;
+        }
+
+        // create new file for this uuid
+        let encoded = bincode::serialize(&put).unwrap();
+        std::fs::write(path, encoded).unwrap();
+
+        // add to updates_put
+        self.updates_put.insert(uuid.to_string());
     }
 
     pub fn get_pagination_meta(&mut self) -> PaginationMetadata {
@@ -293,7 +264,7 @@ impl MutationManager {
         )
     }
 
-    pub fn get(&mut self, image_base_path: &PathBuf) -> MutationResults {
+    pub fn get(&mut self) -> MutationResults {
         let mut result = MutationResults::default();
 
         // extract `page_size` updates from `updates_all` add them to `result`
@@ -302,27 +273,19 @@ impl MutationManager {
                 let path = self.get_mutation_file_path(&entry.uuid);
                 match entry.kind {
                     Kind::Post => {
-                        let update =
+                        let message =
                             std::fs::read(&path).expect("Failed to read post mutation file");
-                        let message: Message = bincode::deserialize(&update)
+                        let message: CompleteMessage = bincode::deserialize(&message)
                             .expect("Failed to parse post mutation file");
-                        let image = match message.has_image {
-                            // true => self.image_store.get(&entry.uuid),
-                            true => image::get(image_base_path, &entry.uuid),
-                            false => None,
-                        };
-                        let complete_message = CompleteMessage::new(message, image);
-                        result.posts.push(complete_message);
+                        result.posts.push(message);
                     }
                     Kind::Put => {
-                        let update =
+                        let server_update =
                             std::fs::read(&path).expect("Failed to read put mutation file");
-                        // do not use `bincode` here because it fails with the `Maybe` type
-                        let update: PutUpdate = serde_json::from_slice(&update)
+                        let server_update: ServerPutUpdate = bincode::deserialize(&server_update)
                             .expect("Failed to parse put mutation file");
-                        let complete_update = CompletePutUpdate::new(update);
                         result.puts_deletes.push(PutDeleteUpdate {
-                            put: Maybe::Value(complete_update),
+                            put: Maybe::Value(ClientPutUpdate::new(entry.uuid, server_update)),
                             delete: Maybe::Absent,
                         });
                     }

@@ -10,7 +10,7 @@ use super::CompleteMessage;
 pub struct PostMessage {
     uuid: String,
     author: String,
-    message: Option<String>,
+    message: String,
     likes: i32,
     imageUpdate: bool,
     image: Option<String>,
@@ -51,25 +51,14 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         }
     }
 
-    let result = match &message {
-        Some(message) => sqlx::query!(
-            "INSERT INTO messages (uuid, author, message, likes, has_image) VALUES ($1, $2, $3, $4, $5)",
-            &uuid,
-            &author,
-            &message,
-            &likes,
-            imageUpdate
-        ),
-        None => {
-            sqlx::query!(
-                "INSERT INTO messages (uuid, author, likes, has_image) VALUES ($1, $2, $3, $4)",
-                &uuid,
-                &author,
-                &likes,
-                imageUpdate
-            )
-        },
-    }
+    let result = sqlx::query!(
+        "INSERT INTO messages (uuid, author, message, likes, has_image) VALUES ($1, $2, $3, $4, $5)",
+        uuid,
+        author,
+        message,
+        likes,
+        imageUpdate
+    )
     .execute(state.pool.as_ref())
     .await;
 

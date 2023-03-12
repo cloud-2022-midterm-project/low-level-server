@@ -1,15 +1,16 @@
+use crate::{
+    app_state::AppState, image, models::Message, mutation_manager::ServerPutUpdate,
+    response::Response,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 
-use serde::Serialize;
-use serde_json::json;
-
-use crate::{app_state::AppState, image, models::Message, response::Response};
-
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Deserialize)]
 pub struct CompleteMessage {
     pub uuid: String,
     pub author: String,
-    pub message: Option<String>,
+    pub message: String,
     pub likes: i32,
     pub image: Option<String>,
 }
@@ -23,6 +24,21 @@ impl CompleteMessage {
             likes: message.likes,
             message: message.message,
         }
+    }
+
+    /// Overwrites the fields of this message with the fields of the other message.
+    pub fn update(&mut self, put: ServerPutUpdate) {
+        self.author = put.author;
+        self.message = put.message;
+        self.likes = put.likes;
+        if put.image_updated {
+            if let Some(image) = put.image {
+                self.image = Some(image);
+            } else {
+                // image is removed
+                self.image = Some("".to_string());
+            }
+        };
     }
 }
 
@@ -63,7 +79,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     {
         let mut mutations = state.mutations.lock().await;
         if !mutations.is_pagination_empty() {
-            let result = mutations.get(&state.image_base_path);
+            let result = mutations.get();
             // drop the lock so that other threads can access the mutations immediately
             drop(mutations);
             // if the pagination is done, reset the flag

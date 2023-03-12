@@ -21,7 +21,7 @@ mod post;
 mod put;
 
 pub use get::{CompleteMessage, PaginationMetadata, PaginationType};
-pub use put::{BindValue, PutMessage};
+pub use put::PutMessage;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {

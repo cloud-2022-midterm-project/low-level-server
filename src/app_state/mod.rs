@@ -1,16 +1,8 @@
+use crate::mutation_manager::MutationManager;
 use ahash::AHashSet;
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
-
-use crate::{handlers::PutMessage, mutation_manager::MutationManager};
-
-#[derive(Serialize, Deserialize)]
-pub struct PutUpdate {
-    pub(crate) fields: PutMessage,
-    pub(crate) uuid: String,
-}
 
 pub struct AppState {
     pub pool: Arc<PgPool>,

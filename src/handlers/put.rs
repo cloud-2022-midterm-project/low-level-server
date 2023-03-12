@@ -1,30 +1,14 @@
-use std::sync::Arc;
-
-use crate::{app_state::AppState, image, maybe::Maybe, response::Response};
-
+use crate::{app_state::AppState, image, mutation_manager::ServerPutUpdate, response::Response};
 use serde::{Deserialize, Serialize};
-
-pub enum BindValue {
-    Author(String),
-    Message(String),
-    Likes(i32),
-    HasImage(bool),
-    ImageUpdate(bool),
-    Image(String),
-}
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct PutMessage {
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub author: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub message: Maybe<String>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub likes: Maybe<i32>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub imageUpdate: Maybe<bool>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub image: Maybe<String>,
+    pub author: String,
+    pub message: String,
+    pub likes: i32,
+    pub imageUpdate: bool,
+    pub image: Option<String>,
 }
 
 pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String {
@@ -45,32 +29,14 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
         }
     };
 
-    let mut command = "UPDATE messages SET ".to_string();
-    let mut index = 1;
+    // There are 3 cases for `image_to_client`:
+    // 1. No update to image, meaning the client will not get an image (null or absent in the response)
+    // 2. Update image with new content, meaning the client will get the new image in the response
+    // 3. Remove image, meaning the client will get an `empty` string in the response
+    let mut image_to_client = None;
 
-    let mut params = Vec::with_capacity(6);
-
-    if let Maybe::Value(author) = payload.author {
-        command.push_str(&format!("author = ${index}, "));
-        index += 1;
-        params.push(BindValue::Author(author));
-    }
-    if let Maybe::Value(message) = payload.message {
-        command.push_str(&format!("message = ${index}, "));
-        index += 1;
-        params.push(BindValue::Message(message));
-    }
-    if let Maybe::Value(likes) = payload.likes {
-        command.push_str(&format!("likes = ${index}, "));
-        index += 1;
-        params.push(BindValue::Likes(likes));
-    }
-
-    if let Maybe::Value(true) = payload.imageUpdate {
-        params.push(BindValue::ImageUpdate(true));
-        command.push_str(&format!("has_image = ${index}, "));
-        index += 1;
-        if let Maybe::Value(image) = payload.image {
+    let result = if payload.imageUpdate {
+        if let Some(image) = payload.image {
             // update image
             if image::save(&state.image_base_path, &image, uuid).is_err() {
                 return response
@@ -78,46 +44,55 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
                     .body("Failed to save image.")
                     .to_string();
             }
-            params.push(BindValue::HasImage(true));
-            params.push(BindValue::Image(image));
+            image_to_client = Some(image);
+            sqlx::query!(
+                "UPDATE messages SET author = $1, message = $2, likes = $3, has_image = $4 WHERE uuid = $5",
+                payload.author,
+                payload.message,
+                payload.likes,
+                true,
+                uuid
+            )
         } else {
             // remove image
             image::remove(&state.image_base_path, uuid).ok();
-            params.push(BindValue::HasImage(false));
+            image_to_client = Some("".to_string());
+            sqlx::query!(
+                "UPDATE messages SET author = $1, message = $2, likes = $3, has_image = $4 WHERE uuid = $5",
+                payload.author,
+                payload.message,
+                payload.likes,
+                false,
+                uuid
+            )
         }
+    } else {
+        sqlx::query!(
+            "UPDATE messages SET author = $1, message = $2, likes = $3 WHERE uuid = $4",
+            payload.author,
+            payload.message,
+            payload.likes,
+            uuid
+        )
     }
-
-    if index == 1 {
-        return response
-            .status_line("HTTP/1.1 400 Bad Request")
-            .body("No fields were provided to update.")
-            .to_string();
-    }
-
-    // remove the last comma
-    command.truncate(command.len() - 2);
-    command.push_str(&format!(" WHERE uuid = ${index}"));
-
-    let mut q = sqlx::query(&command);
-
-    for param in params.iter() {
-        match param {
-            BindValue::Author(v) => q = q.bind(v),
-            BindValue::Message(v) => q = q.bind(v),
-            BindValue::Likes(v) => q = q.bind(v),
-            BindValue::HasImage(v) => q = q.bind(v),
-            _ => (),
-        };
-    }
-
-    let result = q.bind(uuid).execute(state.pool.as_ref()).await;
+    .execute(state.pool.as_ref())
+    .await;
 
     match result {
         Ok(result) => {
             if result.rows_affected() == 0 {
                 response.set_status_line("HTTP/1.1 404 Not Found");
             } else {
-                state.mutations.lock().await.add_put(uuid, params);
+                state.mutations.lock().await.add_put(
+                    uuid,
+                    ServerPutUpdate {
+                        author: payload.author,
+                        message: payload.message,
+                        likes: payload.likes,
+                        image: image_to_client,
+                        image_updated: payload.imageUpdate,
+                    },
+                );
                 response.set_status_line("HTTP/1.1 204 No Content");
             }
         }
