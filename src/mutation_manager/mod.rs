@@ -7,7 +7,7 @@ use crate::{
 };
 use ahash::AHashSet;
 use serde::Serialize;
-use std::{fmt, path::PathBuf};
+use std::{collections::VecDeque, fmt, path::PathBuf};
 
 #[derive(Serialize, Debug)]
 enum Kind {
@@ -106,7 +106,7 @@ pub struct MutationManager {
     updates_put: AHashSet<String>,
     updates_delete: Vec<String>,
     mutation_dir: PathBuf,
-    updates_all: Vec<Entry>,
+    updates_all: VecDeque<Entry>,
     page_size: usize,
 }
 
@@ -128,7 +128,7 @@ impl MutationManager {
                 }
                 path
             },
-            updates_all: Default::default(),
+            updates_all: VecDeque::with_capacity(50_000usize.next_power_of_two()),
             page_size,
         };
         MutationManager::clear_dir(&s.mutation_dir).ok();
@@ -249,7 +249,7 @@ impl MutationManager {
     }
 
     pub fn get_pagination_meta(&mut self) -> PaginationMetadata {
-        let posts: Vec<_> = self
+        let mut posts: Vec<_> = self
             .updates_post
             .drain()
             .map(|uuid| Entry {
@@ -257,6 +257,8 @@ impl MutationManager {
                 uuid,
             })
             .collect();
+        // sort posts by uuid
+        posts.sort_by(|a, b| a.uuid.cmp(&b.uuid));
         self.updates_all.extend(posts);
 
         let mut puts_deletes =
@@ -280,10 +282,8 @@ impl MutationManager {
             .collect();
         self.updates_delete.clear();
         puts_deletes.extend(del);
-
         // sort puts_deletes by uuid
         puts_deletes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-
         self.updates_all.extend(puts_deletes);
 
         PaginationMetadata::new(
@@ -298,7 +298,7 @@ impl MutationManager {
 
         // extract `page_size` updates from `updates_all` add them to `result`
         for _ in 0..self.page_size {
-            if let Some(entry) = self.updates_all.pop() {
+            if let Some(entry) = self.updates_all.pop_front() {
                 let path = self.get_mutation_file_path(&entry.uuid);
                 match entry.kind {
                     Kind::Post => {
