@@ -1,13 +1,9 @@
-pub mod mutation_manager;
-
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::handlers::PutMessage;
-
-use self::mutation_manager::MutationManager;
+use crate::{handlers::PutMessage, mutation_manager::MutationManager};
 
 #[derive(Serialize, Deserialize)]
 pub struct PutUpdate {

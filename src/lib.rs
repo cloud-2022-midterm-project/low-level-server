@@ -5,6 +5,7 @@ mod handlers;
 pub mod image;
 mod maybe;
 mod models;
+pub mod mutation_manager;
 mod request;
 mod response;
 

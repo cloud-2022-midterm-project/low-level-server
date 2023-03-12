@@ -1,8 +1,5 @@
 use dotenv::dotenv;
-use server_low_level::{
-    app_state::{mutation_manager::MutationManager, AppState},
-    handle_connection,
-};
+use server_low_level::{app_state::AppState, handle_connection, mutation_manager::MutationManager};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
