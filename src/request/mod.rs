@@ -25,7 +25,7 @@ impl Request {
         let mut buf_reader = BufReader::new(stream);
 
         // read status line
-        let mut status_line = String::with_capacity(512);
+        let mut status_line = String::with_capacity(128);
         buf_reader.read_line(&mut status_line).await?;
         let status_line = status_line.trim_end();
 
@@ -40,7 +40,7 @@ impl Request {
 
         // read through header section and find content-length if any
         let mut content_length = None;
-        let mut header_line = String::with_capacity(512);
+        let mut header_line = String::with_capacity(128);
         loop {
             buf_reader.read_line(&mut header_line).await?;
             let trimmed = header_line.trim_end();

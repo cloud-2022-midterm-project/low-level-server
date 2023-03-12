@@ -48,7 +48,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     let mut command = "UPDATE messages SET ".to_string();
     let mut index = 1;
 
-    let mut params = Vec::with_capacity(5);
+    let mut params = Vec::with_capacity(6);
 
     if let Maybe::Value(author) = payload.author {
         command.push_str(&format!("author = ${index}, "));

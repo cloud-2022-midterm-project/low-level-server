@@ -113,9 +113,9 @@ pub struct MutationManager {
 impl MutationManager {
     pub fn new(page_size: usize) -> Self {
         let s = Self {
-            updates_post: AHashSet::with_capacity(512),
-            updates_put: AHashSet::with_capacity(512),
-            updates_delete: Vec::with_capacity(512),
+            updates_post: AHashSet::with_capacity(50_000usize.next_power_of_two()),
+            updates_put: AHashSet::with_capacity(10_000usize.next_power_of_two()),
+            updates_delete: Vec::with_capacity(10_000usize.next_power_of_two()),
             mutation_dir: {
                 let path =
                     std::env::var("MUTATIONS_BASE_PATH").expect("MUTATIONS_BASE_PATH must be set");
