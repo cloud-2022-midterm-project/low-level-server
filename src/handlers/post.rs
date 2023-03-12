@@ -37,6 +37,11 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         }
     };
 
+    // check for conflicting uuid
+    if !state.all_uuids.lock().await.insert(uuid.clone()) {
+        return response.status_line("HTTP/1.1 409 CONFLICT").to_string();
+    }
+
     if let (true, Some(image)) = (imageUpdate, &image) {
         if image::save(&state.image_base_path, image, &uuid).is_err() {
             return response

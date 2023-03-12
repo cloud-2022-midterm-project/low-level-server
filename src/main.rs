@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use dotenv::dotenv;
 use server_low_level::{app_state::AppState, handle_connection, mutation_manager::MutationManager};
 use sqlx::postgres::PgPoolOptions;
@@ -57,6 +58,7 @@ async fn main() {
             }
             path.to_path_buf()
         },
+        all_uuids: Mutex::new(AHashSet::with_capacity(50_000usize.next_power_of_two())),
     });
 
     // the address to bind to

@@ -30,6 +30,11 @@ pub struct PutMessage {
 pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
 
+    // check for conflicting uuid
+    if !state.all_uuids.lock().await.contains(uuid) {
+        return response.status_line("HTTP/1.1 404 NOT FOUND").to_string();
+    }
+
     let payload: PutMessage = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(e) => {

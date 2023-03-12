@@ -12,6 +12,7 @@ pub(crate) async fn clear(state: Arc<AppState>) -> String {
         Ok(_) => {
             image::clear(&state.image_base_path).ok();
             state.mutations.lock().await.clear();
+            state.all_uuids.lock().await.clear();
             response.set_status_line("HTTP/1.1 204 NO CONTENT");
         }
         Err(_) => response.set_status_line("HTTP/1.1 500 INTERNAL SERVER ERROR"),

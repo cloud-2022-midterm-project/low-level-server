@@ -5,6 +5,11 @@ use crate::{app_state::AppState, image, response::Response};
 pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
     let mut response = Response::new();
 
+    // check for conflicting uuid
+    if !state.all_uuids.lock().await.remove(uuid) {
+        return response.status_line("HTTP/1.1 404 NOT FOUND").to_string();
+    }
+
     let result = sqlx::query!("DELETE FROM messages WHERE uuid = $1", uuid)
         .execute(state.pool.as_ref())
         .await;

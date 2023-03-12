@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::{path::PathBuf, sync::Arc};
@@ -18,4 +19,5 @@ pub struct AppState {
     pub db_pagination_offset: Mutex<usize>,
     pub triggered_pagination: Mutex<bool>,
     pub image_base_path: PathBuf,
+    pub all_uuids: Mutex<AHashSet<String>>,
 }
