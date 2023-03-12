@@ -181,7 +181,7 @@ impl MutationManager {
     }
 
     pub fn add_put(&mut self, uuid: &str, put: ServerPutUpdate) {
-        let path = self.get_mutation_file_path(&uuid);
+        let path = self.get_mutation_file_path(uuid);
 
         // if there's a post update of this uuid, modify it rather than adding to updates_put
         if self.updates_post.contains(uuid) {
