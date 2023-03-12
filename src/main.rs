@@ -1,5 +1,6 @@
 use ahash::AHashSet;
 use dotenv::dotenv;
+use futures_util::stream::StreamExt;
 use server_low_level::{app_state::AppState, handle_connection, mutation_manager::MutationManager};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
@@ -58,7 +59,18 @@ async fn main() {
             }
             path.to_path_buf()
         },
-        all_uuids: Mutex::new(AHashSet::with_capacity(50_000usize.next_power_of_two())),
+        all_uuids: {
+            let mut uuids = AHashSet::with_capacity(50_000usize.next_power_of_two());
+            let mut stream = sqlx::query!("SELECT uuid FROM messages")
+                .map(|row| row.uuid)
+                .fetch(db_pool_cloned.as_ref());
+            while let Some(uuid) = stream.next().await {
+                let uuid = uuid.expect("Failed to fetch uuid from database");
+                uuids.insert(uuid);
+            }
+            println!("Fetched all {} uuids from database.", uuids.len());
+            Mutex::new(uuids)
+        },
     });
 
     // the address to bind to
