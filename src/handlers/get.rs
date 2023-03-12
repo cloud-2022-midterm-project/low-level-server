@@ -44,9 +44,7 @@ impl CompleteMessage {
 
 #[derive(Serialize, Debug)]
 pub enum PaginationType {
-    #[serde(rename = "cache")]
     Cache,
-    #[serde(rename = "fresh")]
     Fresh,
 }
 
