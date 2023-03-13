@@ -44,7 +44,7 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
             let uri = request.uri().trim_start_matches("/api/messages");
             match uri {
                 "" | "/" => get_pagination_meta(state).await,
-                "/get-page" => handle_get(state).await.into_bytes(),
+                "/get-page" => handle_get(state).await,
                 uri => {
                     // unknown GET request
                     let body = format!("GET uri not found, {}", uri);

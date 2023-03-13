@@ -68,14 +68,15 @@ pub struct DbResults {
     pub messages: Vec<CompleteMessage>,
 }
 
-pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
+pub(crate) async fn handle_get(state: Arc<AppState>) -> Vec<u8> {
     {
         let triggered_pagination = state.triggered_pagination.lock().await;
         if !*triggered_pagination {
             return Response::new()
                 .status_line("HTTP/1.1 403 Forbidden")
                 .body("Pagination not triggered yet.")
-                .to_string();
+                .to_string()
+                .into_bytes();
         }
     }
 
@@ -101,11 +102,13 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
             drop(page_number);
             drop(triggered_pagination);
 
-            let body = serde_json::to_string(&result).unwrap();
-            return response
+            let body = bincode::serialize(&result).unwrap();
+            let mut res = response
                 .append_header(&format!("Content-Length: {}", body.len()))
-                .body(&body)
-                .to_string();
+                .to_string()
+                .into_bytes();
+            res.extend(body);
+            return res;
         }
     }
 
@@ -142,7 +145,8 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
             return response
                 .status_line("HTTP/1.1 500 Internal Server Error")
                 .body("Internal Server Error")
-                .to_string();
+                .to_string()
+                .into_bytes();
         }
     };
 
@@ -169,12 +173,13 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     drop(triggered_pagination);
     drop(offset);
 
-    let res_body = serde_json::to_string(&result).unwrap();
-
-    response
-        .append_header(&format!("Content-Length: {}", res_body.len()))
-        .body(&res_body)
+    let body = bincode::serialize(&result).unwrap();
+    let mut res = response
+        .append_header(&format!("Content-Length: {}", body.len()))
         .to_string()
+        .into_bytes();
+    res.extend(body);
+    res
 }
 
 pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> Vec<u8> {
