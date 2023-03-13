@@ -155,11 +155,11 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
         .to_string()
 }
 
-pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> String {
+pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> Vec<u8> {
     // trigger pagination
     *state.triggered_pagination.lock().await = true;
 
-    let response = Response::new().append_header("Content-Type: application/json");
+    let response = Response::new().append_header("Content-Type: application/octet-stream");
 
     // if there are cached mutation updates, return them
     {
@@ -167,21 +167,25 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> String {
         if !mutations.is_empty_for_pagination() {
             let meta = mutations.get_pagination_meta();
             drop(mutations);
-            let body = serde_json::to_string(&meta).unwrap();
-            return response
+            let body = bincode::serialize(&meta).unwrap();
+            let res_without_body = response
                 .status_line("HTTP/1.1 200 OK")
                 .append_header(&format!("Content-Length: {}", body.len()))
-                .body(body.as_str())
                 .to_string();
+            let mut res = res_without_body.into_bytes();
+            res.extend(body);
+            return res;
         }
     }
 
     let count = state.all_uuids.lock().await.len();
     let meta = PaginationMetadata::new(count, state.pagination_page_size, PaginationType::Fresh);
-    let body = serde_json::to_string(&meta).unwrap();
-    response
+    let body = bincode::serialize(&meta).unwrap();
+    let mut res = response
         .status_line("HTTP/1.1 200 OK")
         .append_header(&format!("Content-Length: {}", body.len()))
-        .body(body.as_str())
         .to_string()
+        .into_bytes();
+    res.extend(body);
+    res
 }

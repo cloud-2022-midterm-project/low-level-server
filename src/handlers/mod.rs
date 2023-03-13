@@ -44,7 +44,7 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
             let uri = request.uri().trim_start_matches("/api/messages");
             match uri {
                 "" | "/" => get_pagination_meta(state).await,
-                "/get-page" => handle_get(state).await,
+                "/get-page" => handle_get(state).await.into_bytes(),
                 uri => {
                     // unknown GET request
                     let body = format!("GET uri not found, {}", uri);
@@ -54,32 +54,35 @@ pub async fn handle_connection(mut stream: TcpStream, state: Arc<AppState>) {
                         .append_header("Content-Type: text/plain")
                         .body(&body)
                         .to_string()
+                        .into_bytes()
                 }
             }
         }
         Method::Post => match request.body() {
-            Some(body) => handle_post(body, state).await,
+            Some(body) => handle_post(body, state).await.into_bytes(),
             None => Response::new()
                 .status_line("HTTP/1.1 411 LENGTH REQUIRED")
-                .to_string(),
+                .to_string()
+                .into_bytes(),
         },
         Method::Put => match request.body() {
             Some(body) => {
                 let uuid = request.uri().trim_start_matches("/api/messages/");
-                handle_put(uuid, body, state).await
+                handle_put(uuid, body, state).await.into_bytes()
             }
             None => Response::new()
                 .status_line("HTTP/1.1 411 LENGTH REQUIRED")
-                .to_string(),
+                .to_string()
+                .into_bytes(),
         },
         Method::Delete => {
             let uuid = request.uri().trim_start_matches("/api/messages/");
-            handle_delete(uuid, state).await
+            handle_delete(uuid, state).await.into_bytes()
         }
-        Method::Patch => clear(state).await,
+        Method::Patch => clear(state).await.into_bytes(),
     };
 
-    if let Err(e) = stream.write_all(response.as_bytes()).await {
+    if let Err(e) = stream.write_all(&response).await {
         eprintln!("Failed to send response: {}", e);
     }
 }
