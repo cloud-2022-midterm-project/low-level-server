@@ -34,10 +34,9 @@ pub struct Entry {
 
 #[derive(Serialize, Debug)]
 pub struct PutDeleteUpdate {
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    put: Maybe<ClientPutUpdate>,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    delete: Maybe<String>,
+    uuid: String,
+    put: Option<ClientPutUpdate>,
+    delete: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -88,7 +87,6 @@ impl ServerPutUpdate {
 #[derive(Serialize, Debug, Deserialize)]
 /// The update that the client sees.
 pub struct ClientPutUpdate {
-    pub uuid: String,
     pub author: String,
     pub message: String,
     pub likes: i32,
@@ -97,7 +95,7 @@ pub struct ClientPutUpdate {
 }
 
 impl ClientPutUpdate {
-    fn new(uuid: String, update: ServerPutUpdate) -> Self {
+    fn new(update: ServerPutUpdate) -> Self {
         let image = if update.image_updated {
             if let Some(image) = update.image {
                 Maybe::Value(image)
@@ -113,7 +111,6 @@ impl ClientPutUpdate {
             likes: update.likes,
             message: update.message,
             image,
-            uuid,
         }
     }
 }
@@ -285,14 +282,16 @@ impl MutationManager {
                         let server_update: ServerPutUpdate = bincode::deserialize(&server_update)
                             .expect("Failed to parse put mutation file");
                         result.puts_deletes.push(PutDeleteUpdate {
-                            put: Maybe::Value(ClientPutUpdate::new(entry.uuid, server_update)),
-                            delete: Maybe::Absent,
+                            uuid: entry.uuid,
+                            put: Some(ClientPutUpdate::new(server_update)),
+                            delete: false,
                         });
                     }
                     Kind::Delete => {
                         result.puts_deletes.push(PutDeleteUpdate {
-                            put: Maybe::Absent,
-                            delete: Maybe::Value(entry.uuid),
+                            uuid: entry.uuid,
+                            put: None,
+                            delete: true,
                         });
                     }
                 }
