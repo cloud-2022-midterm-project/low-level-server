@@ -56,7 +56,7 @@ pub struct PaginationMetadata {
 impl PaginationMetadata {
     pub fn new(count_all: usize, page_size: usize, kind: PaginationType) -> Self {
         PaginationMetadata {
-            total_pages: (count_all / page_size) + 1,
+            total_pages: (count_all as f64 / page_size as f64).ceil() as usize,
             kind,
         }
     }

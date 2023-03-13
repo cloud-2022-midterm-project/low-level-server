@@ -305,6 +305,7 @@ impl MutationManager {
             }
         }
 
+        result.done = result.done || self.updates_all.is_empty();
         result
     }
 
