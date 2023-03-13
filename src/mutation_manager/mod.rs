@@ -1,7 +1,4 @@
-use crate::{
-    handlers::{CompleteMessage, PaginationMetadata, PaginationType},
-    maybe::Maybe,
-};
+use crate::handlers::{CompleteMessage, PaginationMetadata, PaginationType};
 use ahash::AHashSet;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt, path::PathBuf};
@@ -90,21 +87,20 @@ pub struct ClientPutUpdate {
     pub author: String,
     pub message: String,
     pub likes: i32,
-    #[serde(default, skip_serializing_if = "Maybe::is_absent")]
-    pub image: Maybe<String>,
+    pub image: Option<String>,
 }
 
 impl ClientPutUpdate {
     fn new(update: ServerPutUpdate) -> Self {
         let image = if update.image_updated {
             if let Some(image) = update.image {
-                Maybe::Value(image)
+                Some(image)
             } else {
                 // image is removed
-                Maybe::Value("".to_string())
+                Some("".to_string())
             }
         } else {
-            Maybe::Absent
+            None
         };
         Self {
             author: update.author,
