@@ -151,6 +151,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> Vec<u8> {
     };
 
     let mut page_number = state.pagination_page_number.lock().await;
+    *page_number += 1;
     let mut triggered_pagination = state.triggered_pagination.lock().await;
 
     let result = DbResults {
@@ -158,15 +159,13 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> Vec<u8> {
         messages,
     };
 
-    // increase or reset the offset
-    if result.messages.len() == state.pagination_page_size {
-        *offset += state.pagination_page_size;
-        *page_number += 1;
-    } else {
+    if *page_number == *state.pages_count.lock().await {
         // pagination is done, reset the offset and the flag
         *offset = 0;
         *triggered_pagination = false;
         *page_number = 0;
+    } else {
+        *offset += state.pagination_page_size;
     }
 
     // drop the locks so that other threads can access the flag and offset immediately
@@ -193,6 +192,7 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> Vec<u8> {
         let mut mutations = state.mutations.lock().await;
         if !mutations.is_empty_for_pagination() {
             let meta = mutations.get_pagination_meta();
+            *state.pages_count.lock().await = meta.total_pages;
             drop(mutations);
             let body = bincode::serialize(&meta).unwrap();
             let res_without_body = response
@@ -207,6 +207,7 @@ pub(crate) async fn get_pagination_meta(state: Arc<AppState>) -> Vec<u8> {
 
     let count = state.all_uuids.lock().await.len();
     let meta = PaginationMetadata::new(count, state.pagination_page_size, PaginationType::Fresh);
+    *state.pages_count.lock().await = meta.total_pages;
     let body = bincode::serialize(&meta).unwrap();
     let mut res = response
         .status_line("HTTP/1.1 200 OK")

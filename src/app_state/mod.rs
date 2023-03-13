@@ -13,4 +13,5 @@ pub struct AppState {
     pub triggered_pagination: Mutex<bool>,
     pub image_base_path: PathBuf,
     pub all_uuids: Mutex<AHashSet<String>>,
+    pub pages_count: Mutex<usize>,
 }

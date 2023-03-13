@@ -72,6 +72,7 @@ async fn main() {
             Mutex::new(uuids)
         },
         pagination_page_number: Mutex::new(0),
+        pages_count: Mutex::new(0),
     });
 
     // the address to bind to
