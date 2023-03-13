@@ -3,7 +3,6 @@ use crate::{
     response::Response,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
 
 #[derive(Serialize, Debug, Deserialize)]
@@ -63,13 +62,21 @@ impl PaginationMetadata {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DbResults {
+    pub page_number: usize,
+    pub messages: Vec<CompleteMessage>,
+}
+
 pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
-    let mut triggered_pagination = state.triggered_pagination.lock().await;
-    if !*triggered_pagination {
-        return Response::new()
-            .status_line("HTTP/1.1 403 Forbidden")
-            .body("Pagination not triggered yet.")
-            .to_string();
+    {
+        let triggered_pagination = state.triggered_pagination.lock().await;
+        if !*triggered_pagination {
+            return Response::new()
+                .status_line("HTTP/1.1 403 Forbidden")
+                .body("Pagination not triggered yet.")
+                .to_string();
+        }
     }
 
     let response = Response::new().append_header("Content-Type: application/json");
@@ -77,12 +84,21 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
     {
         let mut mutations = state.mutations.lock().await;
         if !mutations.is_pagination_empty() {
-            let result = mutations.get();
-            // drop the lock so that other threads can access the mutations immediately
+            let mut page_number = state.pagination_page_number.lock().await;
+
+            let result = mutations.get(*page_number);
             drop(mutations);
-            // if the pagination is done, reset the flag
-            *triggered_pagination = !result.done;
-            // drop the locks so that other threads can access the flag immediately
+
+            *page_number += 1;
+
+            // if the pagination is done, reset the flag, and page_number
+            let mut triggered_pagination = state.triggered_pagination.lock().await;
+            if result.done {
+                *triggered_pagination = false;
+                *page_number = 0;
+            }
+
+            drop(page_number);
             drop(triggered_pagination);
 
             let body = serde_json::to_string(&result).unwrap();
@@ -108,6 +124,15 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
         state.pagination_page_size as i64,
         *offset as i64
     )
+    .map(|m| {
+        let image = {
+            match m.has_image {
+                true => image::get(&state.image_base_path, &m.uuid),
+                false => None,
+            }
+        };
+        CompleteMessage::new(m, image)
+    })
     .fetch_all(state.pool.as_ref())
     .await
     {
@@ -121,33 +146,30 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> String {
         }
     };
 
+    let mut page_number = state.pagination_page_number.lock().await;
+    let mut triggered_pagination = state.triggered_pagination.lock().await;
+
+    let result = DbResults {
+        page_number: *page_number,
+        messages,
+    };
+
     // increase or reset the offset
-    if messages.len() == state.pagination_page_size {
+    if result.messages.len() == state.pagination_page_size {
         *offset += state.pagination_page_size;
+        *page_number += 1;
     } else {
         // pagination is done, reset the offset and the flag
         *offset = 0;
         *triggered_pagination = false;
+        *page_number = 0;
     }
 
     // drop the locks so that other threads can access the flag and offset immediately
     drop(triggered_pagination);
     drop(offset);
 
-    let messages: Vec<CompleteMessage> = messages
-        .into_iter()
-        .map(|m| {
-            let image = {
-                match m.has_image {
-                    true => image::get(&state.image_base_path, &m.uuid),
-                    false => None,
-                }
-            };
-            CompleteMessage::new(m, image)
-        })
-        .collect();
-
-    let res_body = json!(messages).to_string();
+    let res_body = serde_json::to_string(&result).unwrap();
 
     response
         .append_header(&format!("Content-Length: {}", res_body.len()))

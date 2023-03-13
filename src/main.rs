@@ -71,6 +71,7 @@ async fn main() {
             println!("Fetched all {} uuids from database.", uuids.len());
             Mutex::new(uuids)
         },
+        pagination_page_number: Mutex::new(0),
     });
 
     // the address to bind to

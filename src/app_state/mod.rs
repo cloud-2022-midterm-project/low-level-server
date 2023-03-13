@@ -9,6 +9,7 @@ pub struct AppState {
     pub mutations: Mutex<MutationManager>,
     pub pagination_page_size: usize,
     pub db_pagination_offset: Mutex<usize>,
+    pub pagination_page_number: Mutex<usize>,
     pub triggered_pagination: Mutex<bool>,
     pub image_base_path: PathBuf,
     pub all_uuids: Mutex<AHashSet<String>>,

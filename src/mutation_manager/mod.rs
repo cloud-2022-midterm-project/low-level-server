@@ -41,6 +41,7 @@ pub struct MutationResults {
     pub posts: Vec<CompleteMessage>,
     pub puts_deletes: Vec<PutDeleteUpdate>,
     pub done: bool,
+    pub page_number: usize,
 }
 
 impl MutationResults {
@@ -49,6 +50,7 @@ impl MutationResults {
             done: false,
             posts: Vec::with_capacity(32),
             puts_deletes: Vec::with_capacity(32),
+            page_number: 0,
         }
     }
 }
@@ -257,8 +259,9 @@ impl MutationManager {
         )
     }
 
-    pub fn get(&mut self) -> MutationResults {
+    pub fn get(&mut self, page_number: usize) -> MutationResults {
         let mut result = MutationResults::default();
+        result.page_number = page_number;
 
         // extract `page_size` updates from `updates_all` add them to `result`
         for _ in 0..self.page_size {
