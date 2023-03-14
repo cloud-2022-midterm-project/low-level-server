@@ -2,6 +2,7 @@ use crate::handlers::{CompleteMessage, PaginationMetadata, PaginationType};
 use ahash::AHashSet;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt, path::PathBuf};
+use ts_rs::TS;
 
 #[derive(Serialize, Debug)]
 enum Kind {
@@ -29,14 +30,16 @@ pub struct Entry {
     uuid: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, TS)]
+#[ts(export)]
 pub struct PutDeleteUpdate {
     uuid: String,
     put: Option<ClientPutUpdate>,
     delete: bool,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, TS)]
+#[ts(export)]
 pub struct MutationResults {
     pub posts: Vec<CompleteMessage>,
     pub puts_deletes: Vec<PutDeleteUpdate>,
@@ -83,7 +86,8 @@ impl ServerPutUpdate {
     }
 }
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, TS)]
+#[ts(export)]
 /// The update that the client sees.
 pub struct ClientPutUpdate {
     pub author: String,

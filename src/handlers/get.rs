@@ -4,8 +4,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use ts_rs::TS;
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, TS)]
+#[ts(export)]
 pub struct CompleteMessage {
     pub uuid: String,
     pub author: String,
@@ -62,7 +64,8 @@ impl PaginationMetadata {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct DbResults {
     pub page_number: usize,
     pub messages: Vec<CompleteMessage>,
