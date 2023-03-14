@@ -2,6 +2,10 @@
 
 This is a low-level, destined to fail, overengineered server for cloud computing midterm.
 
+## For TA and Ajarn
+
+The entry point of server is at [src/main.rs](./src/main.rs).
+
 ## How to run
 
 ### INSTALL RUST and cargo
