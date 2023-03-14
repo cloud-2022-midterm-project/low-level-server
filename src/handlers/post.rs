@@ -43,7 +43,8 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
     }
 
     if let (true, Some(image)) = (imageUpdate, &image) {
-        if image::save(&state.image_base_path, image, &uuid).is_err() {
+        if let Err(e) = image::save(&state.image_base_path, image, &uuid) {
+            eprintln!("Error saving image: {}", e);
             return response
                 .status_line("HTTP/1.1 500 Internal Server Error")
                 .body("Failed to save image.")

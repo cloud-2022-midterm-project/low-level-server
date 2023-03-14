@@ -38,12 +38,14 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     let result = if payload.imageUpdate {
         if let Some(image) = payload.image {
             // update image
-            if image::save(&state.image_base_path, &image, uuid).is_err() {
+            if let Err(e) = image::save(&state.image_base_path, &image, uuid) {
+                eprintln!("Error saving image: {}", e);
                 return response
                     .status_line("HTTP/1.1 500 Internal Server Error")
                     .body("Failed to save image.")
                     .to_string();
             }
+
             image_to_client = Some(image);
             sqlx::query!(
                 "UPDATE messages SET author = $1, message = $2, likes = $3, has_image = $4 WHERE uuid = $5",
