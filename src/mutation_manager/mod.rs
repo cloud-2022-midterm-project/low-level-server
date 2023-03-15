@@ -1,6 +1,6 @@
 use crate::{
     handlers::{CompleteMessage, PaginationMetadata, PaginationType},
-    try_write_perm,
+    image, try_write_perm,
 };
 use ahash::AHashSet;
 use serde::{Deserialize, Serialize};
@@ -77,14 +77,50 @@ pub struct ServerPutUpdate {
     pub image: Option<String>,
 }
 
-impl ServerPutUpdate {
-    fn update(&mut self, other: ServerPutUpdate) {
+#[derive(Serialize, Debug, Deserialize)]
+pub struct ServerPutUpdateWithoutImage {
+    pub author: String,
+    pub message: String,
+    pub likes: i32,
+    pub image_updated: bool,
+}
+
+impl ServerPutUpdateWithoutImage {
+    fn update(&mut self, other: ServerPutUpdate, base_image_path: &PathBuf, uuid: &str) {
         self.author = other.author;
         self.message = other.message;
         self.likes = other.likes;
         self.image_updated = other.image_updated || self.image_updated;
         if other.image_updated {
-            self.image = other.image;
+            if let Some(image) = other.image {
+                image::save(base_image_path, &image, uuid).ok();
+            } else {
+                // image is removed
+                image::remove(base_image_path, uuid).ok();
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Deserialize)]
+pub struct MessageWithoutImage {
+    pub uuid: String,
+    pub author: String,
+    pub message: String,
+    pub likes: i32,
+}
+
+impl MessageWithoutImage {
+    pub fn update(&mut self, put: ServerPutUpdate, image_base_path: &PathBuf) {
+        self.author = put.author;
+        self.message = put.message;
+        self.likes = put.likes;
+        if put.image_updated {
+            if let Some(image) = put.image {
+                image::save(image_base_path, &image, &self.uuid).ok();
+            } else {
+                image::remove(image_base_path, &self.uuid).ok();
+            }
         };
     }
 }
@@ -100,9 +136,10 @@ pub struct ClientPutUpdate {
 }
 
 impl ClientPutUpdate {
-    fn new(update: ServerPutUpdate) -> Self {
+    fn new(update: ServerPutUpdateWithoutImage, image_base_path: &PathBuf, uuid: &str) -> Self {
         let image = if update.image_updated {
-            if let Some(image) = update.image {
+            let image = image::get(image_base_path, uuid);
+            if let Some(image) = image {
                 Some(image)
             } else {
                 // image is removed
@@ -166,17 +203,29 @@ impl MutationManager {
             && self.updates_delete.is_empty()
     }
 
-    pub fn add_post(&mut self, message: CompleteMessage) {
+    pub fn add_post(&mut self, message: CompleteMessage, image_base_path: &PathBuf) {
         // save the message to the mutation directory
         let path = self.get_mutation_file_path(&message.uuid);
-        let encoded = bincode::serialize(&message).unwrap();
+        if let Some(image) = message.image {
+            image::save(image_base_path, &image, &message.uuid).ok();
+        };
+        let message_without_image = MessageWithoutImage {
+            author: message.author,
+            likes: message.likes,
+            message: message.message,
+            uuid: message.uuid,
+        };
+        let encoded = bincode::serialize(&message_without_image).unwrap();
         std::fs::write(path, encoded).unwrap();
-        self.updates_post.insert(message.uuid);
+        self.updates_post.insert(message_without_image.uuid);
     }
 
-    pub fn add_delete(&mut self, uuid: &str) {
+    pub fn add_delete(&mut self, uuid: &str, image_base_path: &PathBuf) {
         // remove from updates_put if it exists
         self.updates_put.remove(uuid);
+
+        // remove image file if any
+        image::remove(image_base_path, uuid).ok();
 
         // remove from updates_post if it exists
         if !self.updates_post.remove(uuid) {
@@ -184,21 +233,21 @@ impl MutationManager {
         }
     }
 
-    pub fn add_put(&mut self, uuid: &str, put: ServerPutUpdate) {
+    pub fn add_put(&mut self, uuid: &str, put: ServerPutUpdate, image_base_path: &PathBuf) {
         let path = self.get_mutation_file_path(uuid);
 
         // if there's a post update of this uuid, modify it rather than adding to updates_put
         if self.updates_post.contains(uuid) {
             // retrieve the message from the file
             let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
-            let mut message: CompleteMessage =
+            let mut message_without_image: MessageWithoutImage =
                 bincode::deserialize(&file_content).expect("Failed to deserialize message");
 
             // overwrite the message with the new values
-            message.update(put);
+            message_without_image.update(put, image_base_path);
 
             // write back to the file
-            let encoded = bincode::serialize(&message).unwrap();
+            let encoded = bincode::serialize(&message_without_image).unwrap();
             std::fs::write(&path, encoded).unwrap();
             return;
         }
@@ -206,17 +255,32 @@ impl MutationManager {
         if self.updates_put.contains(uuid) {
             // retrieve the message from the file
             let file_content = std::fs::read(&path).expect("Failed to read put mutation file");
-            let mut update: ServerPutUpdate =
+            let mut update: ServerPutUpdateWithoutImage =
                 bincode::deserialize(&file_content).expect("Failed to deserialize message");
-            update.update(put);
+            update.update(put, image_base_path, uuid);
             // write back to the file
             let encoded = bincode::serialize(&update).unwrap();
             std::fs::write(&path, encoded).unwrap();
             return;
         }
 
+        let put_without_image = ServerPutUpdateWithoutImage {
+            author: put.author,
+            image_updated: put.image_updated,
+            likes: put.likes,
+            message: put.message,
+        };
+        if put.image_updated {
+            if let Some(image) = put.image {
+                image::save(image_base_path, &image, uuid).ok();
+            } else {
+                // image is removed
+                image::remove(image_base_path, uuid).ok();
+            }
+        }
+
         // create new file for this uuid
-        let encoded = bincode::serialize(&put).unwrap();
+        let encoded = bincode::serialize(&put_without_image).unwrap();
         std::fs::write(path, encoded).unwrap();
 
         // add to updates_put
@@ -268,7 +332,7 @@ impl MutationManager {
         )
     }
 
-    pub fn get(&mut self, page_number: usize) -> MutationResults {
+    pub fn get(&mut self, page_number: usize, image_base_path: &PathBuf) -> MutationResults {
         let mut result = MutationResults::default();
         result.page_number = page_number;
 
@@ -278,20 +342,33 @@ impl MutationManager {
                 let path = self.get_mutation_file_path(&entry.uuid);
                 match entry.kind {
                     Kind::Post => {
-                        let message =
+                        let message_without_image =
                             std::fs::read(&path).expect("Failed to read post mutation file");
-                        let message: CompleteMessage = bincode::deserialize(&message)
-                            .expect("Failed to parse post mutation file");
-                        result.posts.push(message);
+                        let message_without_image: MessageWithoutImage =
+                            bincode::deserialize(&message_without_image)
+                                .expect("Failed to parse post mutation file");
+                        let complete_message = CompleteMessage {
+                            author: message_without_image.author,
+                            image: image::get(image_base_path, &message_without_image.uuid),
+                            likes: message_without_image.likes,
+                            message: message_without_image.message,
+                            uuid: message_without_image.uuid,
+                        };
+                        result.posts.push(complete_message);
                     }
                     Kind::Put => {
                         let server_update =
                             std::fs::read(&path).expect("Failed to read put mutation file");
-                        let server_update: ServerPutUpdate = bincode::deserialize(&server_update)
-                            .expect("Failed to parse put mutation file");
+                        let server_update: ServerPutUpdateWithoutImage =
+                            bincode::deserialize(&server_update)
+                                .expect("Failed to parse put mutation file");
                         result.puts_deletes.push(PutDeleteUpdate {
+                            put: Some(ClientPutUpdate::new(
+                                server_update,
+                                image_base_path,
+                                &entry.uuid,
+                            )),
                             uuid: entry.uuid,
-                            put: Some(ClientPutUpdate::new(server_update)),
                             delete: false,
                         });
                     }

@@ -94,6 +94,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
                         image: image_to_client,
                         image_updated: payload.imageUpdate,
                     },
+                    &state.image_base_path,
                 );
                 response.set_status_line("HTTP/1.1 204 No Content");
             }

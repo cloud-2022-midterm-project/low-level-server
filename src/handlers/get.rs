@@ -1,7 +1,4 @@
-use crate::{
-    app_state::AppState, image, models::Message, mutation_manager::ServerPutUpdate,
-    response::Response,
-};
+use crate::{app_state::AppState, image, models::Message, response::Response};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_rs::TS;
@@ -25,21 +22,6 @@ impl CompleteMessage {
             likes: message.likes,
             message: message.message,
         }
-    }
-
-    /// Overwrites the fields of this message with the fields of the other message.
-    pub fn update(&mut self, put: ServerPutUpdate) {
-        self.author = put.author;
-        self.message = put.message;
-        self.likes = put.likes;
-        if put.image_updated {
-            if let Some(image) = put.image {
-                self.image = Some(image);
-            } else {
-                // image is removed
-                self.image = Some("".to_string());
-            }
-        };
     }
 }
 
@@ -90,7 +72,7 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> Vec<u8> {
         if !mutations.is_pagination_empty() {
             let mut page_number = state.pagination_page_number.lock().await;
 
-            let result = mutations.get(*page_number);
+            let result = mutations.get(*page_number, &state.image_base_path);
             drop(mutations);
 
             *page_number += 1;

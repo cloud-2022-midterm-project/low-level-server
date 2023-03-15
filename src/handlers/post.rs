@@ -65,13 +65,16 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
 
     match result {
         Ok(_) => {
-            state.mutations.lock().await.add_post(CompleteMessage {
-                uuid,
-                author,
-                message,
-                likes,
-                image,
-            });
+            state.mutations.lock().await.add_post(
+                CompleteMessage {
+                    uuid,
+                    author,
+                    message,
+                    likes,
+                    image: if imageUpdate { image } else { None },
+                },
+                &state.image_base_path,
+            );
             response.set_status_line("HTTP/1.1 201 OK");
         }
         Err(_) => {

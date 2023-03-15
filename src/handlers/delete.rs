@@ -21,7 +21,11 @@ pub(crate) async fn handle_delete(uuid: &str, state: Arc<AppState>) -> String {
             } else {
                 // remove from image store if it exists
                 image::remove(&state.image_base_path, uuid).ok();
-                state.mutations.lock().await.add_delete(uuid);
+                state
+                    .mutations
+                    .lock()
+                    .await
+                    .add_delete(uuid, &state.image_base_path);
                 response.set_status_line("HTTP/1.1 204 NO CONTENT");
             }
         }
