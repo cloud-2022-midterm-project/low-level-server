@@ -1,4 +1,7 @@
-use crate::handlers::{CompleteMessage, PaginationMetadata, PaginationType};
+use crate::{
+    handlers::{CompleteMessage, PaginationMetadata, PaginationType},
+    try_write_perm,
+};
 use ahash::AHashSet;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt, path::PathBuf};
@@ -142,6 +145,8 @@ impl MutationManager {
                         "MUTATIONS_BASE_PATH directory does not exist, the given path is {path:?}."
                     );
                 }
+                // try writing and deleting a file to check if we have write permissions
+                try_write_perm(&path);
                 path
             },
             updates_all: VecDeque::with_capacity(50_000usize.next_power_of_two()),

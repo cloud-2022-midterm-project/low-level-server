@@ -1,7 +1,9 @@
 use ahash::AHashSet;
 use dotenv::dotenv;
 use futures_util::stream::StreamExt;
-use server_low_level::{app_state::AppState, handle_connection, mutation_manager::MutationManager};
+use server_low_level::{
+    app_state::AppState, handle_connection, mutation_manager::MutationManager, try_write_perm,
+};
 use sqlx::postgres::PgPoolOptions;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
@@ -57,6 +59,8 @@ async fn main() {
             if !std::path::Path::new(&path).exists() {
                 panic!("IMAGES_BASE_PATH directory does not exist, the given path is {path:#?}.");
             }
+            // try writing and deleting a file to check if we have write permissions
+            try_write_perm(&path);
             path.to_path_buf()
         },
         all_uuids: {
