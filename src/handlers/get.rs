@@ -10,11 +10,11 @@ pub struct CompleteMessage {
     pub author: String,
     pub message: String,
     pub likes: i32,
-    pub image: Option<String>,
+    pub image: String,
 }
 
 impl CompleteMessage {
-    pub fn new(message: Message, image: Option<String>) -> Self {
+    pub fn new(message: Message, image: String) -> Self {
         CompleteMessage {
             uuid: message.uuid,
             author: message.author,
@@ -115,8 +115,8 @@ pub(crate) async fn handle_get(state: Arc<AppState>) -> Vec<u8> {
     .map(|m| {
         let image = {
             match m.has_image {
-                true => image::get(&state.image_base_path, &m.uuid),
-                false => None,
+                true => image::get(&state.image_base_path, &m.uuid).unwrap_or("".to_string()),
+                false => "".to_string(),
             }
         };
         CompleteMessage::new(m, image)

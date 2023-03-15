@@ -13,7 +13,7 @@ pub struct PostMessage {
     message: String,
     likes: i32,
     imageUpdate: bool,
-    image: Option<String>,
+    image: String,
 }
 
 pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
@@ -25,7 +25,7 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         message,
         likes,
         imageUpdate,
-        image,
+        mut image,
     } = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(e) => {
@@ -42,13 +42,26 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
         return response.status_line("HTTP/1.1 409 CONFLICT").to_string();
     }
 
-    if let (true, Some(image)) = (imageUpdate, &image) {
-        if let Err(e) = image::save(&state.image_base_path, image, &uuid) {
-            eprintln!("Error saving image: {}", e);
-            return response
-                .status_line("HTTP/1.1 500 Internal Server Error")
-                .body("Failed to save image.")
-                .to_string();
+    // if let (true, "") = (imageUpdate, image) {
+    // if let Err(e) = image::save(&state.image_base_path, image, &uuid) {
+    //     eprintln!("Error saving image: {}", e);
+    //     return response
+    //         .status_line("HTTP/1.1 500 Internal Server Error")
+    //         .body("Failed to save image.")
+    //         .to_string();
+    // }
+    // }
+    if imageUpdate {
+        if !image.is_empty() {
+            if let Err(e) = image::save(&state.image_base_path, &image, &uuid) {
+                eprintln!("Error saving image: {}", e);
+                return response
+                    .status_line("HTTP/1.1 500 Internal Server Error")
+                    .body("Failed to save image.")
+                    .to_string();
+            }
+        } else {
+            image = String::new();
         }
     }
 
@@ -71,9 +84,10 @@ pub async fn handle_post(body: &str, state: Arc<AppState>) -> String {
                     author,
                     message,
                     likes,
-                    image: if imageUpdate { image } else { None },
+                    image,
                 },
                 &state.image_base_path,
+                imageUpdate,
             );
             response.set_status_line("HTTP/1.1 201 OK");
         }

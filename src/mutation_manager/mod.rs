@@ -203,11 +203,16 @@ impl MutationManager {
             && self.updates_delete.is_empty()
     }
 
-    pub fn add_post(&mut self, message: CompleteMessage, image_base_path: &PathBuf) {
+    pub fn add_post(
+        &mut self,
+        message: CompleteMessage,
+        image_base_path: &PathBuf,
+        image_updated: bool,
+    ) {
         // save the message to the mutation directory
         let path = self.get_mutation_file_path(&message.uuid);
-        if let Some(image) = message.image {
-            image::save(image_base_path, &image, &message.uuid).ok();
+        if image_updated {
+            image::save(image_base_path, &message.image, &message.uuid).ok();
         };
         let message_without_image = MessageWithoutImage {
             author: message.author,
@@ -349,7 +354,8 @@ impl MutationManager {
                                 .expect("Failed to parse post mutation file");
                         let complete_message = CompleteMessage {
                             author: message_without_image.author,
-                            image: image::get(image_base_path, &message_without_image.uuid),
+                            image: image::get(image_base_path, &message_without_image.uuid)
+                                .unwrap_or("".to_string()),
                             likes: message_without_image.likes,
                             message: message_without_image.message,
                             uuid: message_without_image.uuid,

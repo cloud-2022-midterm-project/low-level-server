@@ -8,7 +8,7 @@ pub struct PutMessage {
     pub message: String,
     pub likes: i32,
     pub imageUpdate: bool,
-    pub image: Option<String>,
+    pub image: String,
 }
 
 pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String {
@@ -36,9 +36,9 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
     let mut image_to_client = None;
 
     let result = if payload.imageUpdate {
-        if let Some(image) = payload.image {
+        if !payload.image.is_empty() {
             // update image
-            if let Err(e) = image::save(&state.image_base_path, &image, uuid) {
+            if let Err(e) = image::save(&state.image_base_path, &payload.image, uuid) {
                 eprintln!("Error saving image: {}", e);
                 return response
                     .status_line("HTTP/1.1 500 Internal Server Error")
@@ -46,7 +46,7 @@ pub async fn handle_put(uuid: &str, body: &str, state: Arc<AppState>) -> String 
                     .to_string();
             }
 
-            image_to_client = Some(image);
+            image_to_client = Some(payload.image);
             sqlx::query!(
                 "UPDATE messages SET author = $1, message = $2, likes = $3, has_image = $4 WHERE uuid = $5",
                 payload.author,
